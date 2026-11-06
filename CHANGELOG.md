@@ -24,4 +24,5 @@ The first version, for macOS and Linux.
 - `inventory` and `scan` skip common password-manager files and SSH private keys, wherever they are.
 - `compare` reports small files with a match elsewhere as `possibly-moved`, not `missing`.
 - Small jobs keep their plan and result in `~/migration-jobs/`, not a temporary folder.
+- A full migration creates its folder before the first inventory, and a destination that doesn't exist yet no longer prompts a question.
 - `compare` lists excluded paths as not compared, so a skipped keychain can't look like a clean result.

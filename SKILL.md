@@ -37,7 +37,9 @@ Before writing anything, look for an existing migration. Each migration has its 
 
 - **Folder has `state.json`, and it's this migration:** run `migrate.py status --dir <folder>`, read `decisions.md`, re-verify the current state, summarize it, and continue.
 - **Folder is someone else's, or unrelated:** leave it alone, and use a new name.
-- **No folder:** run `migrate.py init`. It refuses a folder that's in use.
+- **No folder:** run `migrate.py init` as soon as you know the migration's name and machines, before the first inventory, so early results aren't lost with a temporary folder. It refuses a folder that's in use, and it only records state, so it's fine to do before a plan is approved.
+
+If the user names a destination that doesn't exist yet, that's normal: plan to create it, and don't ask them to confirm it again.
 
 Ask only what you need to start:
 
@@ -86,6 +88,7 @@ Plans must be approved before they run. Run `migrate.py approve --plan <file>`, 
 ## Working with the user
 
 - Ask in small batches, each with a recommendation. Explain consequences in plain terms.
+- Keep the first report short: what's there, what needs a decision now, and what you couldn't check. Offer the detail, and don't send it all at once.
 - Separate what you measured from what you inferred, and correct your own mistakes as soon as you find them.
 - Copying credentials is the user's choice; offer to create new ones instead.
 - Don't assume SSH, a NAS, a second machine being on, or a particular backup tool. Ask.

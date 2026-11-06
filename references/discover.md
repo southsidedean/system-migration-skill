@@ -1,6 +1,6 @@
 # Phase 1: Discover
 
-Read-only. Nothing is installed, changed, or copied except inventory output in the migration folder.
+Read-only on every machine. The only thing written is output in this migration's folder, so create that first with `migrate.py init`.
 
 ## Inventory each machine
 
