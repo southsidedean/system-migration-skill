@@ -8,6 +8,7 @@ Commands print a short summary, write detail to files, and use fixed exit codes:
   status     print the phase, next step, and gaps
   advance    move to a phase
   decide     record a decision and render decisions.md
+  approve    show a plan, and tie the user's approval to its exact contents
   record     record dated evidence for the gate
   collect    write apps, packages, and settings to JSON (read-only)
   copy       copy from a plan: dry run by default, verified with --run
@@ -178,9 +179,18 @@ def load_plan(path, needs):
     return plan
 
 
+def plan_hash(plan):
+    """Hash of everything in a plan except its approval, so any later edit voids the approval."""
+    body = {key: value for key, value in plan.items() if key != "approval"}
+    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+
+
 def require_approval(plan):
-    if plan.get("approved_by_user") is not True:
-        raise SystemExit("the plan doesn't have \"approved_by_user\": true. Show it to the user first.")
+    approval = plan.get("approval") or {}
+    if not approval:
+        raise SystemExit("the plan isn't approved. Show it to the user, then run `approve` with their words.")
+    if approval.get("sha256") != plan_hash(plan):
+        raise SystemExit("the plan changed after it was approved. Show the user the new plan, and run `approve` again.")
 
 
 def state_path(folder):
@@ -189,6 +199,32 @@ def state_path(folder):
 
 def load_state(folder):
     return load_json(state_path(folder), "state")
+
+
+# --- approve
+
+def describe_plan(plan):
+    lines = ["%s: %s" % (key, plan[key]) for key in ("name", "source", "base", "dest", "dest_dir", "notes") if plan.get(key)]
+    lines.append("items (%d): %s" % (len(plan["items"]), ", ".join(plan["items"][:20])))
+    if len(plan["items"]) > 20:
+        lines.append("... and %d more" % (len(plan["items"]) - 20))
+    return lines
+
+
+def cmd_approve(args):
+    plan = load_json(args.plan, "plan")
+    check_items(plan.get("items", []))
+    for line in describe_plan(plan):
+        print(line)
+    if not args.user_said:
+        print("Not approved. Show this to the user. Then run again with --user-said and their words.")
+        return OK
+    if not args.user_said.strip():
+        raise SystemExit("--user-said needs the user's words")
+    plan["approval"] = {"sha256": plan_hash(plan), "date": now(), "user_said": args.user_said}
+    save_json(args.plan, plan)
+    print("Approved this exact plan. Any later edit voids it.")
+    return OK
 
 
 # --- init, status, advance
@@ -304,7 +340,8 @@ def cmd_gate(args):
             results.append((kind, "fail", "stale: the source changed afterward"))
         elif (current - when).total_seconds() > args.max_age_hours * 3600:
             results.append((kind, "fail", "stale: older than %d hours" % args.max_age_hours))
-        elif kind == "final-compare" and (entry.get("empty_dirs") or (entry.get("classes") or {}).get("missing")):
+        elif kind == "final-compare" and (entry.get("empty_dirs") or (entry.get("classes") or {}).get("missing")
+                                          or (entry.get("classes") or {}).get("possibly-moved")):
             results.append((kind, "fail", "missing files or empty folders remain; decide them or accept the risk"))
         elif kind == "final-compare" and not entry.get("classes"):
             results.append((kind, "fail", "no compare summary was recorded with --file"))
@@ -672,6 +709,11 @@ def main():
     p.add_argument("--action", choices=ACTIONS, required=True)
     p.add_argument("--reason")
     p.set_defaults(func=cmd_decide)
+
+    p = sub.add_parser("approve")
+    p.add_argument("--plan", required=True)
+    p.add_argument("--user-said", help="the user's words approving this plan")
+    p.set_defaults(func=cmd_approve)
 
     p = sub.add_parser("record")
     p.add_argument("--dir", required=True)

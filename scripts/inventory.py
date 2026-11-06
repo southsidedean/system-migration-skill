@@ -33,6 +33,10 @@ DEFAULT_EXCLUDES = [
     "go/pkg/mod/cache", "*/__pycache__", "__pycache__",
     # Credential stores are counted but never opened, even to hash them.
     "Library/Keychains", ".local/share/keyrings", ".local/share/kwalletd", ".gnupg", ".password-store",
+    # Common password-manager and keychain files, wherever they are. A store with an
+    # unfamiliar name can't be recognized, so ask the user about any they mention.
+    "*.keychain", "*.keychain-db", "*.kdbx", "*.kdb", "*.agilekeychain", "*.opvault", "*.1pux",
+    ".ssh/id_*", "*/.ssh/id_*",
 ]
 
 

@@ -26,7 +26,7 @@ Supported: macOS and Linux. Windows isn't supported yet; say so rather than impr
 
 Match the process to the request, and don't run phases nobody needs.
 
-- **Small job:** one copy, delete, check, or archive that the user has already scoped and approved. Skip the migration folder, phases, and scan. Write the plan to a temporary folder, use the one `migrate.py` command with its dry run, and report the result. If the data might be sensitive, or the request grows, say so and move to a full migration.
+- **Small job:** one copy, delete, check, or archive that the user has already scoped and approved. Skip the migration folder, phases, and scan. Write the plan to `~/migration-jobs/<YYYY-MM-DD>-<name>/`, not a temporary folder, so there's a record. Use the one `migrate.py` command with its dry run, and report the result. If the data might be sensitive, or the request grows, say so and move to a full migration.
 - **Full migration:** moving, merging, or retiring a machine. Use the phases below.
 
 The rules above apply to both.
@@ -81,7 +81,7 @@ Use `scripts/migrate.py <command>` for anything it covers. Don't write your own 
 
 Commands print short summaries and write detail to files, so open a file only when a result needs a decision. Exit codes: 0 ok, 1 failed a check, 2 bad input or incomplete data. A non-zero exit is never "looks fine".
 
-Plans need `"approved_by_user": true` to run. Set it only after the user has seen that plan and approved it. Use `scripts/run-awake.sh <command>` for long jobs, including downloads. `python3 scripts/test_scripts.py` and `python3 scripts/test_migrate.py` test the scripts.
+Plans must be approved before they run. Run `migrate.py approve --plan <file>`, show the user what it prints, and once they've approved that plan, run it again with `--user-said "<their words>"`. If the user can't see the plan, say so, and stick to what they explicitly named; never quote words they didn't say. Any edit voids an approval. Use `scripts/run-awake.sh <command>` for long jobs, including downloads. `python3 scripts/test_scripts.py` and `python3 scripts/test_migrate.py` test the scripts.
 
 ## Working with the user
 

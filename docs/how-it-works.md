@@ -72,6 +72,8 @@ Each full migration has its own folder:
 | `*.tsv`, `compare-*/` | Inventories and comparison results |
 | `terms.txt` | Search terms, which may include customer names. Don't share it. |
 
+Small jobs don't use a migration folder. Their plan and result go in `~/migration-jobs/<date>-<name>/`.
+
 These can name real files and organizations, so keep them private.
 
 ## Migration shapes

@@ -68,7 +68,7 @@ python3 scripts/migrate.py collect --output old-mac.json
 
 ### `inventory`
 
-Lists every file, with its hash. Run it on the machine that holds the files. Credential stores and caches are counted, but not opened.
+Lists every file, with its hash. Run it on the machine that holds the files. Caches, known credential stores, password-manager files, and SSH private keys are counted, but not opened.
 
 ```sh
 python3 scripts/migrate.py inventory --root home=$HOME --root apps=/Applications --output old-mac.tsv
@@ -84,7 +84,7 @@ Classifies every source file against the destination, and fails if the counts do
 python3 scripts/migrate.py compare --source old-mac.tsv --dest new-mac.tsv --output compare-1
 ```
 
-It writes `compare-1/summary.json` and `compare-1/classified.tsv`. For a merge, list paths that conflict across sources:
+It writes `compare-1/summary.json` and `compare-1/classified.tsv`. Excluded paths, such as caches and credential stores, are listed as not compared. For a merge, list paths that conflict across sources:
 
 ```sh
 python3 scripts/migrate.py compare --conflicts laptop.tsv desktop.tsv --output conflicts
@@ -100,7 +100,12 @@ python3 scripts/migrate.py scan --root $HOME --terms terms.txt --output scan.tsv
 
 ## Actions that use a plan
 
-A plan is a JSON file. To run, it needs `"approved_by_user": true`, which means you've seen and approved it.
+A plan is a JSON file. To run, it needs an approval tied to its exact contents, so editing it afterward voids the approval:
+
+```sh
+python3 scripts/migrate.py approve --plan stage-1.json                        # shows the plan
+python3 scripts/migrate.py approve --plan stage-1.json --user-said "go ahead" # records your words
+```
 
 ### `copy`
 
@@ -110,8 +115,7 @@ A dry run by default. With `--run`, it copies, keeps newer destination files, re
 {
   "source": "me@old-mac:/Users/me",
   "dest": "/Users/me",
-  "items": ["Documents", "Pictures/Trips", "notes.txt"],
-  "approved_by_user": true
+  "items": ["Documents", "Pictures/Trips", "notes.txt"]
 }
 ```
 
@@ -132,8 +136,7 @@ Builds a `.tar.gz`, checks every file against the source, and writes a checksum,
   "source": "me@old-mac:/Users/me",
   "items": ["projects/old-job"],
   "dest_dir": "/Volumes/nas/archives",
-  "notes": "Holds unencrypted credentials, by my choice.",
-  "approved_by_user": true
+  "notes": "Holds unencrypted credentials, by my choice."
 }
 ```
 
@@ -150,8 +153,7 @@ A dry run by default. It deletes exact paths only, and stops without deleting an
 ```json
 {
   "base": "me@old-mac:/Users/me",
-  "items": ["projects/old-job"],
-  "approved_by_user": true
+  "items": ["projects/old-job"]
 }
 ```
 

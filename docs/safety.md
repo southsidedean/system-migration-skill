@@ -8,7 +8,7 @@ A migration can lose data for good, so the skill is cautious by design. This pag
 - **Overwrite newer files at the destination.** They're reported instead.
 - **Delete by wildcard.** Deletes use exact paths, with a dry run first. If one path can't be found, nothing is deleted.
 - **Show your secrets or file contents.** Reports use paths, sizes, hashes, and counts.
-- **Read your credential stores,** such as keychains, even as raw bytes.
+- **Read your credential stores,** such as keychains and password-manager files, even as raw bytes. It can only recognize known types, so tell Claude about any others.
 - **Erase a machine.** You do that yourself, after the final check.
 - **Work around a permission block.** It tells you, and leaves the choice to you.
 - **Send your data to an outside service** without asking.
@@ -19,6 +19,7 @@ A migration can lose data for good, so the skill is cautious by design. This pag
 |---|---|
 | `identical` | Same path, same hash. The copy's confirmed. |
 | `moved` | Same contents at a different path |
+| `possibly-moved` | A very small file with a match at a different path, which could be a coincidence. Check it. |
 | `different` | Same path, different contents. Review it. Opening an app can change its files. |
 | `missing` | Not at the destination. Copy it, or confirm you meant to leave it. |
 | `blocked` | The destination couldn't be read, so this wasn't checked |
@@ -48,7 +49,7 @@ Evidence goes stale after 24 hours by default, or as soon as the source changes.
 
 Please know these limits:
 
-- **Approval is a process, not a lock.** Plans need `"approved_by_user": true`, but Claude writes that file, based on what you've told it. Read what it shows you before you approve.
+- **Approval is a process, not a lock.** An approval records your words and is tied to the plan's exact contents, so a later edit voids it. But Claude runs that command, so it depends on Claude showing you the plan and quoting you honestly. Read what it shows you before you approve.
 - **The final check trusts its evidence.** Most checks are recorded by Claude or you. Only the comparison reads actual results.
 - **Blocked folders stay unknown.** Without Full Disk Access on macOS, it can't read Mail, Messages, and other protected data at the destination.
 - **Content searches have gaps.** The scan can't read inside PDFs, Office files, images, or archive contents. It lists those as not searched.

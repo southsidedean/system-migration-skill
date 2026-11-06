@@ -3,12 +3,14 @@
 Copy one stage at a time, and verify it before starting the next. Use `migrate.py copy`, which avoids the traps below and verifies every file by hash.
 
 ```json
-{"source": "user@old-mac:/Users/me", "dest": "/Users/me", "items": ["Documents", "#notes.txt"], "approved_by_user": true}
+{"source": "user@old-mac:/Users/me", "dest": "/Users/me", "items": ["Documents", "#notes.txt"]}
 ```
 
 ```sh
-python3 migrate.py copy --plan stage-1.json        # dry run
-python3 migrate.py copy --plan stage-1.json --run  # copy and verify
+python3 migrate.py copy --plan stage-1.json                          # dry run
+python3 migrate.py approve --plan stage-1.json                       # show it to the user
+python3 migrate.py approve --plan stage-1.json --user-said "go ahead"
+python3 migrate.py copy --plan stage-1.json --run                    # copy and verify
 ```
 
 Exit 0 means every planned file is at the destination with the same hash. Different files are never overwritten; they're reported for review. Read `stage-1.json.result.json` only if the result isn't clean.
@@ -49,7 +51,8 @@ It writes `summary.json` and `classified.tsv`, and exits non-zero if the counts 
 | Class | Meaning | Action |
 |---|---|---|
 | `identical` | Same path, same hash | None |
-| `moved` | Same hash at another path | Confirm this is expected, and confirm that it isn't just a coincidental match on a tiny file |
+| `moved` | Same hash at another path | Confirm this is expected |
+| `possibly-moved` | A file under 64 bytes, with a match at another path | It could be a coincidence, so check `found_at`. The gate treats this as unresolved. |
 | `different` | Same path, different hash | Check which is newer and why. Opening an app changes its database. |
 | `missing` | Not found at destination | Check against `decisions.md`. Copy it, or confirm that it was deliberately left. |
 | `blocked` | Destination path unreadable | NOT VERIFIED. Offer the user a way to check. |

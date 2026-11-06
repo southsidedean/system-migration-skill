@@ -94,6 +94,15 @@ class InventoryTests(Base):
         self.assertEqual(len(excluded), 1)
         self.assertEqual(excluded[0].split("\t")[5], "1")
 
+    def test_credential_files_are_counted_not_hashed(self):
+        for rel in ("Documents/vault.kdbx", ".ssh/id_ed25519", "backup/old.keychain-db"):
+            write(self.src, rel)
+        out = self.inventory(self.src, "s.tsv")
+        with open(out) as handle:
+            rows = handle.read().splitlines()
+        self.assertEqual(sum(1 for r in rows if r.startswith("f\t")), 0)
+        self.assertEqual(sum(1 for r in rows if r.startswith("x\t")), 3)
+
     def test_credential_store_is_counted_not_hashed(self):
         write(self.src, "Library/Keychains/login.keychain-db")
         out = self.inventory(self.src, "s.tsv")
@@ -130,10 +139,18 @@ class CompareTests(Base):
         result, summary, _ = self.compare()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(summary["classes"], {
-            "identical": 1, "different": 1, "missing": 1, "moved": 1,
+            "identical": 1, "different": 1, "missing": 1, "moved": 1, "possibly-moved": 0,
             "type-mismatch": 1, "blocked": 0, "unverified": 0})
         self.assertEqual(summary["source_files"], summary["classified"])
         self.assertEqual(summary["dest_only_files"], 3)
+
+    def test_excluded_paths_are_reported_not_silent(self):
+        write(self.src, "Documents/vault.kdbx")
+        write(self.src, "plain.txt")
+        write(self.dst, "plain.txt")
+        result, summary, _ = self.compare()
+        self.assertEqual(summary["excluded_at_source"], ["home/Documents/vault.kdbx"])
+        self.assertIn("NOT COMPARED", result.stdout)
 
     def test_folder_that_arrived_empty_is_caught(self):
         write(self.src, "folder/a.txt", b"a " * 50)
@@ -147,8 +164,9 @@ class CompareTests(Base):
         write(self.src, "a/tiny.txt", b"x")
         write(self.dst, "b/other.txt", b"x")
         _, summary, _ = self.compare()
-        self.assertEqual(summary["classes"]["missing"], 1)
+        self.assertEqual(summary["classes"]["possibly-moved"], 1)
         self.assertEqual(summary["classes"]["moved"], 0)
+        self.assertEqual(summary["classes"]["missing"], 0)
 
     @unittest.skipIf(os.geteuid() == 0, "root can read anything")
     def test_blocked_destination_is_not_called_missing(self):
@@ -207,7 +225,7 @@ class CompareTests(Base):
 
 
 class ScanTests(Base):
-    PLANTED_SECRET = "plantedvalue1234567890"
+    PLANTED_VALUE = "plantedvalue1234567890"
 
     def scan(self, *terms):
         path = os.path.join(self.tmp, "terms.txt")
@@ -227,10 +245,10 @@ class ScanTests(Base):
         self.assertEqual(row[0].split("\t")[3], "2")
 
     def test_output_never_contains_the_matching_text(self):
-        write(self.src, "notes.txt", ("examplecustomer token=%s\n" % self.PLANTED_SECRET).encode())
+        write(self.src, "notes.txt", ("examplecustomer token=%s\n" % self.PLANTED_VALUE).encode())
         result, text = self.scan("examplecustomer")
-        self.assertNotIn(self.PLANTED_SECRET, text)
-        self.assertNotIn(self.PLANTED_SECRET, result.stdout + result.stderr)
+        self.assertNotIn(self.PLANTED_VALUE, text)
+        self.assertNotIn(self.PLANTED_VALUE, result.stdout + result.stderr)
         self.assertNotIn("token=", text)
 
     def test_name_match_and_archive_member_name(self):
@@ -267,6 +285,13 @@ class ScanTests(Base):
         _, text = self.scan("examplecustomer")
         self.assertEqual(text.count("match\tcontent"), 1)
         self.assertEqual(text.count("not-searched\tcredential-store"), 3)
+
+    def test_password_manager_file_is_never_read(self):
+        write(self.src, "Documents/vault.kdbx", b"examplecustomer")
+        write(self.src, "plain.txt", b"examplecustomer")
+        _, text = self.scan("examplecustomer")
+        self.assertEqual(text.count("match\tcontent"), 1)
+        self.assertIn("not-searched\tcredential-store", text)
 
     def test_empty_terms_refused(self):
         path = os.path.join(self.tmp, "terms.txt")

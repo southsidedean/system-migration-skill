@@ -35,6 +35,8 @@ UNREADABLE_FORMATS = {
     ".7z", ".rar", ".gpg", ".age", ".enc", ".sqlite", ".db",
 }
 ARCHIVES = (".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
+# Password-manager and keychain files: flagged by name, never read.
+CREDENTIAL_FILES = re.compile(rb"\.(keychain|keychain-db|kdbx|kdb|agilekeychain|opvault|1pux)$", re.I)
 SECRET_NAMES = re.compile(
     rb"(^|/)(\.env(\.[^/]*)?|id_rsa|id_ed25519|id_ecdsa|credentials|kubeconfig|[^/]*\.pem|[^/]*\.p12|[^/]*\.pfx)$",
     re.I,
@@ -169,6 +171,9 @@ def scan(root, patterns, output, max_size):
                 skipped("cloud-placeholder", st.st_size, path)
                 continue
             lower = name.lower()
+            if CREDENTIAL_FILES.search(lower):
+                skipped("credential-store", st.st_size, path)
+                continue
             if lower.endswith(tuple(a.encode() for a in ARCHIVES)):
                 members = archive_names(path)
                 if members is None:
