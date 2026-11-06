@@ -49,6 +49,8 @@ tmutil destinationinfo
 
 - `~/Library/Keychains/login.keychain-db` can be copied as a file and added using Keychain Access > File > Add Keychain. It opens with the keychain's password, which may not match the current login password.
 - The folders with UUID names under `~/Library/Keychains` hold Local Items, which don't move as files. Have the user review them on the source.
+- Never give a copied keychain a name ending in `login`, such as `old-login.keychain-db`. In testing on macOS 26, those wouldn't unlock with the right password, in any folder, while `old-login-2.keychain-db` worked. So a failure under such a name proves nothing. Rename the copy and test again before concluding that it's bad.
+- `inventory` and `compare` skip keychains, so they can't confirm a keychain copy. Report them as not compared, and test by opening them.
 - Don't assume where passwords live. Check Passwords, the keychains, and browsers with the user.
 - App data encrypted with a key in the source's keychain, such as Chrome's cookies and saved passwords, won't decrypt at the destination.
 

@@ -45,6 +45,7 @@ macOS includes its own `rsync`, called openrsync. Check with `rsync --version`.
 
 - **Don't assume where your passwords are.** They may be in Passwords, a keychain, or a browser.
 - **Login keychain:** `~/Library/Keychains/login.keychain-db` can be copied, then added with Keychain Access > File > Add Keychain. It opens with the keychain's password, which may differ from your current login password.
+- **Don't end the copy's name in `login`.** In testing on macOS 26, a keychain named `old-login.keychain-db` wouldn't unlock with the right password, in any folder, while `old-login-2.keychain-db` worked. If a copy rejects a password you know is right, try another name before deciding it's bad.
 - **Local Items:** the folders with long ID names in `~/Library/Keychains` don't move as files, so review them on the old Mac.
 - **Test it, and test again.** Copied keychains can change after you add them, and we've seen a copy start rejecting its password.
 - **Browsers:** Chrome's saved passwords and cookies depend on a key in the old Mac's keychain, so they may not work after a copy. Firefox keeps its own.

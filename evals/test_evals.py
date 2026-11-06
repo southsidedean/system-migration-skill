@@ -39,6 +39,20 @@ class EvalFixtures(unittest.TestCase):
             self.assertEqual(tool("score", number, folder).returncode, 1, "eval %s" % number)
             shutil.rmtree(folder)
 
+    @unittest.skipUnless(shutil.which("security"), "needs macOS keychains")
+    def test_eval_16_real_keychains_differ(self):
+        folder = self.build("16")
+        new = os.path.join(folder, "new-machine/my-keys.keychain-db")
+        old = os.path.join(folder, "old-machine/my-keys.keychain-db")
+        try:
+            try_password = os.path.join(folder, "try-password")
+            self.assertEqual(subprocess.run([try_password, old], capture_output=True).returncode, 0)
+            self.assertNotEqual(subprocess.run([try_password, new], capture_output=True).returncode, 0)
+            self.assertEqual(tool("score", "16", folder).returncode, 1)
+        finally:
+            for path in (new, old):
+                subprocess.run(["security", "delete-keychain", path], capture_output=True)
+
     def test_eval_1_really_has_an_empty_folder(self):
         folder = self.build("1")
         receipts = os.path.join(folder, "new-machine/Downloads/receipts")

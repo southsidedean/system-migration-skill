@@ -144,6 +144,14 @@ class CompareTests(Base):
         self.assertEqual(summary["source_files"], summary["classified"])
         self.assertEqual(summary["dest_only_files"], 3)
 
+    def test_excluded_paths_are_reported_not_silent(self):
+        write(self.src, "Documents/vault.kdbx")
+        write(self.src, "plain.txt")
+        write(self.dst, "plain.txt")
+        result, summary, _ = self.compare()
+        self.assertEqual(summary["excluded_at_source"], ["home/Documents/vault.kdbx"])
+        self.assertIn("NOT COMPARED", result.stdout)
+
     def test_folder_that_arrived_empty_is_caught(self):
         write(self.src, "folder/a.txt", b"a " * 50)
         write(self.src, "folder/sub/b.txt", b"b " * 50)

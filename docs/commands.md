@@ -84,7 +84,7 @@ Classifies every source file against the destination, and fails if the counts do
 python3 scripts/migrate.py compare --source old-mac.tsv --dest new-mac.tsv --output compare-1
 ```
 
-It writes `compare-1/summary.json` and `compare-1/classified.tsv`. For a merge, list paths that conflict across sources:
+It writes `compare-1/summary.json` and `compare-1/classified.tsv`. Excluded paths, such as caches and credential stores, are listed as not compared. For a merge, list paths that conflict across sources:
 
 ```sh
 python3 scripts/migrate.py compare --conflicts laptop.tsv desktop.tsv --output conflicts

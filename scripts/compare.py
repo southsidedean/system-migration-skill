@@ -124,6 +124,7 @@ def run_compare(args):
         "classes": {name: totals.get(name, 0) for name in CLASSES},
         "bytes_missing": sum(row[1] for row in rows if row[0] == "missing"),
         "dest_only_files": sum(1 for k, e in dest.items() if e[0] == "f" and k not in source),
+        "excluded_at_source": sorted(k for k, e in source.items() if e[0] == "x"),
         "empty_dirs_at_dest": empty_dirs(source, dest, blocked),
         "dest_unreadable_roots": sorted(k for k in blocked if dest[k][1].startswith("err:")),
         "source_counts": source_end,
@@ -138,6 +139,8 @@ def run_compare(args):
         json.dump(summary, out, indent=2, sort_keys=True)
 
     print(json.dumps({k: summary[k] for k in ("source_files", "classified", "classes", "dest_only_files")}, sort_keys=True))
+    if summary["excluded_at_source"]:
+        print("NOT COMPARED: %d excluded path(s), such as caches and credential stores, listed in summary.json" % len(summary["excluded_at_source"]))
     if summary["empty_dirs_at_dest"]:
         print("EMPTY AT DESTINATION: %d folder(s), listed in summary.json" % len(summary["empty_dirs_at_dest"]))
     if classified != source_files or source_files == 0:

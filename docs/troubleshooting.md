@@ -24,6 +24,10 @@
 
 **`items must be paths inside the base folder`.** Items need to be relative paths, without `..`, such as `Documents/taxes`.
 
+## Keychains
+
+**A copied keychain rejects the right password.** On macOS, check its name. In testing on macOS 26, names ending in `login`, such as `old-login.keychain-db`, wouldn't unlock. Rename the file so that it ends in something else, such as `old-login-2.keychain-db`, and try again. If you've added it to Keychain Access, remove it there first. Keychains can also keep an older password than your current login password.
+
 ## Permissions
 
 **`Operation not permitted` on a Mac.** macOS is protecting that folder. See [macOS notes](macos.md#privacy-protections). The skill records it as not verified, and doesn't work around it.
