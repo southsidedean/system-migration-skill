@@ -34,7 +34,7 @@ Names aren't reliable. For example, a folder called `Insurance` might hold a cus
    python3 scan_sensitive.py --root $HOME --terms terms.txt --output scan.tsv
    ```
 
-   It skips credential stores, even as raw bytes. Never write your own search that prints matching lines or record fields, because those end up in transcripts.
+   It skips known credential stores and password-manager files, even as raw bytes, but it can't recognize a store with an unfamiliar name, so ask the user about any they mention. Never write your own search that prints matching lines or record fields, because those end up in transcripts.
 4. Read `scan.tsv`, classify results, and discard obvious false positives, saying why. Public learning material mentioning a product isn't the same as a customer's data.
 5. Report `not-searched` entries: PDFs, Office files, images, nested or encrypted archives, and oversized files. Have the user review the ones that matter.
 6. Also ask about Downloads, Desktop, Trash, and app data, where work files tend to collect.
@@ -54,7 +54,7 @@ For secrets and client data, suggest encryption. `migrate.py archive` doesn't en
 Confirm the destination has room, and check for an earlier archive. Don't assume same-named paths hold the same contents. Scope by contents and Git remotes, and check that nothing belonging to that owner was missed.
 
 ```json
-{"name": "employer-a", "source": "user@old-mac:/Users/me", "items": ["projects/employer-a"], "dest_dir": "/Volumes/nas/archives", "approved_by_user": true, "notes": "Holds unencrypted credentials, by owner's choice."}
+{"name": "employer-a", "source": "user@old-mac:/Users/me", "items": ["projects/employer-a"], "dest_dir": "/Volumes/nas/archives", "notes": "Holds unencrypted credentials, by owner's choice."}
 ```
 
 ```sh
@@ -66,7 +66,7 @@ It builds under a temporary name, hashes the stream and the read-back, checks ev
 Deleting originals is a separate, explicit step:
 
 ```json
-{"base": "user@old-mac:/Users/me", "items": ["projects/employer-a"], "approved_by_user": true}
+{"base": "user@old-mac:/Users/me", "items": ["projects/employer-a"]}
 ```
 
 ```sh

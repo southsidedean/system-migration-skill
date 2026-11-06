@@ -18,7 +18,9 @@
 
 **The dry run lists nothing.** Either everything's already there, or the plan is wrong. Check its paths.
 
-**`the plan doesn't have "approved_by_user": true`.** A plan must be approved before it runs. Check it first, then have Claude set this, or set it yourself.
+**`the plan isn't approved`.** A plan must be approved before it runs. Read it, then approve it, or run `migrate.py approve --plan <file> --user-said "<your words>"` yourself.
+
+**`the plan changed after it was approved`.** Someone edited the plan after you approved it. Read the new version, and approve it again.
 
 **`items must be paths inside the base folder`.** Items need to be relative paths, without `..`, such as `Documents/taxes`.
 
@@ -34,7 +36,7 @@
 
 **Lots of `different` files.** Opening an app changes its files, so databases and `.DS_Store` often differ. Look at where they are before worrying, but don't dismiss them all without looking.
 
-**A file shows as `moved`.** Its contents exist at another path. Check that this is what you expected.
+**A file shows as `moved` or `possibly-moved`.** Its contents exist at another path. Check that this is what you expected. `possibly-moved` means the file is very small, so the match could be a coincidence.
 
 **A folder is listed in `empty_dirs_at_dest`.** It has files on the source and none at the destination, which is usually a failed copy. Resolve each one.
 

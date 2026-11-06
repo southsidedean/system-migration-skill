@@ -31,7 +31,9 @@ Latest run: November 6, 2026, on Ubuntu 24.04 in a disposable VM. Each scenario 
 
 ## Problems the runs found
 
-- **Sessions can self-approve plans.** Sessions set `approved_by_user` from the user's request, without showing the exact plan. One said so itself. This is a known limit, documented in `docs/safety.md`.
+Fixed since this run, but not yet re-run as sessions: approvals, thin records for small jobs, credential-like files, and moved small files.
+
+- **Sessions can self-approve plans.** Sessions approved plans from the user's request, without showing the exact plan. One said so itself. Approvals now record the user's words and bind to the plan's contents, but it's still a process, not a lock.
 - **Collisions in the first run.** Two sessions shared a default folder. The skill now gives each migration its own named folder.
 - **Migration records are thin for small jobs.** Plans and results in those jobs go to a temporary folder that may not last, and sessions said so.
 - **Credential-like files outside known stores get read.** A session hashed a password store because of its path, as `inventory` only skips known credential folders.

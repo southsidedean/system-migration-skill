@@ -40,11 +40,14 @@ class Base(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
-    def plan(self, plan_file="plan.json", **fields):
-        fields.setdefault("approved_by_user", True)
+    def plan(self, plan_file="plan.json", approved=True, **fields):
         path = os.path.join(self.tmp, plan_file)
         with open(path, "w") as handle:
             json.dump(fields, handle)
+        if approved:
+            result = migrate("approve", "--plan", path, "--user-said", "yes, that plan")
+            if result.returncode != OK and "inside the base folder" not in result.stderr:
+                raise AssertionError(result.stderr)
         return path
 
     def init(self):
@@ -102,9 +105,32 @@ class CopyTests(Base):
 
     def test_run_refuses_unapproved_plan(self):
         write(self.src, "a.txt")
-        result = migrate("copy", "--plan", self.copy_plan(["a.txt"], approved_by_user=False), "--run")
+        result = migrate("copy", "--plan", self.copy_plan(["a.txt"], approved=False), "--run")
         self.assertNotEqual(result.returncode, OK)
         self.assertFalse(os.path.exists(os.path.join(self.dst, "a.txt")))
+
+    def test_editing_an_approved_plan_voids_the_approval(self):
+        write(self.src, "a.txt")
+        write(self.src, "other.txt")
+        path = self.copy_plan(["a.txt"])
+        with open(path) as handle:
+            plan = json.load(handle)
+        self.assertEqual(plan["approval"]["user_said"], "yes, that plan")
+        plan["items"] = ["a.txt", "other.txt"]
+        with open(path, "w") as handle:
+            json.dump(plan, handle)
+        result = migrate("copy", "--plan", path, "--run")
+        self.assertNotEqual(result.returncode, OK)
+        self.assertIn("changed after it was approved", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.dst, "other.txt")))
+
+    def test_approve_without_words_shows_the_plan_and_approves_nothing(self):
+        path = self.copy_plan(["a.txt"], approved=False)
+        result = migrate("approve", "--plan", path)
+        self.assertEqual(result.returncode, OK)
+        self.assertIn("Not approved", result.stdout)
+        with open(path) as handle:
+            self.assertNotIn("approval", json.load(handle))
 
     def test_escaping_paths_are_refused(self):
         for bad in ("../outside", "/etc/passwd", ".", "a/../.."):
@@ -290,6 +316,8 @@ class StateAndGateTests(Base):
         self.init()
         self.pass_all()
         self.record("final-compare", "pass", "--file", self.compare_summary(missing=3))
+        self.assertEqual(self.gate().returncode, FAILED)
+        self.record("final-compare", "pass", "--file", self.compare_summary(**{"possibly-moved": 1}))
         self.assertEqual(self.gate().returncode, FAILED)
 
     def test_accepted_risk_needs_a_note_and_then_passes(self):

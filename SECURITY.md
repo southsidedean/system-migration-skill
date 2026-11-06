@@ -27,7 +27,7 @@ For example:
 - **No dependencies:** the skill uses only Python's standard library.
 - **No network calls of its own:** the scripts only contact machines you name, over SSH.
 - **No shell for file names:** paths go to tools as arguments or over stdin. The one exception is the base folder in a remote `tar` command, which is quoted.
-- **Plans and dry runs:** destructive commands need an approved plan, and `copy` and `delete` default to a dry run.
+- **Plans and dry runs:** destructive commands need a plan approved in its exact form, and `copy` and `delete` default to a dry run.
 - **A pinned CI:** actions are pinned to exact commits, with minimal permissions.
 
 ## Limits

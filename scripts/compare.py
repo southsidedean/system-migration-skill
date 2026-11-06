@@ -17,8 +17,8 @@ import json
 import os
 import sys
 
-CLASSES = ["identical", "moved", "different", "missing", "blocked", "unverified", "type-mismatch"]
-MIN_MOVE_SIZE = 64  # smaller matches are too likely to be a coincidence
+CLASSES = ["identical", "moved", "possibly-moved", "different", "missing", "blocked", "unverified", "type-mismatch"]
+MIN_MOVE_SIZE = 64  # a smaller match could be a coincidence, so it needs a person to check
 
 
 def load(path):
@@ -72,8 +72,9 @@ def classify(source, dest):
         elif other is None:
             if blocked_ancestor(key, blocked):
                 verdict = "blocked"
-            elif entry[2] >= MIN_MOVE_SIZE and entry[3] in hashes:
-                verdict, where = "moved", hashes[entry[3]]
+            elif entry[3] in hashes:
+                verdict = "moved" if entry[2] >= MIN_MOVE_SIZE else "possibly-moved"
+                where = hashes[entry[3]]
             else:
                 verdict = "missing"
         elif other[0] != "f":
