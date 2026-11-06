@@ -1,0 +1,45 @@
+# The form for reporting a problem. Issues are public, so it reminds people to remove private details.
+name: Something isn't working
+description: A script, the skill's behavior, or the docs aren't doing what you expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this.
+
+        **Issues are public.** Please remove anything private first: hostnames, usernames, file paths, employers, customer names, and any secrets. For a security problem, please report it privately instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: The steps or command, if you know them.
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: For example, macOS 15 to Ubuntu 24.04. Include `rsync --version` if it's about copying.
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: "`python3 --version`"
+  - type: dropdown
+    id: data
+    attributes:
+      label: Could this have lost or exposed data?
+      options:
+        - "No"
+        - "Not sure"
+        - "Yes"
+    validations:
+      required: true
