@@ -40,7 +40,7 @@ Then ask Claude something like "Help me migrate from my old Mac to my new one."
 | `SKILL.md` | The rules and phases |
 | `references/` | Detail for each phase and platform, loaded when needed |
 | `templates/` | Status doc, decisions log, archive manifest |
-| `scripts/` | Inventory, comparison, sensitive-data scan, keep-awake wrapper, tests |
+| `scripts/` | `migrate.py` and its helpers, which do the deterministic work, plus tests |
 | `evals/` | Test scenarios with planted traps |
 
 ## Development
@@ -49,7 +49,11 @@ The scripts need Python 3.8 or later and nothing else.
 
 ```sh
 python3 scripts/test_scripts.py
+python3 scripts/test_migrate.py
+MIGRATE_TEST_HOST=user@host python3 scripts/test_migrate.py  # also tests over SSH
 ```
+
+The script tests pass on macOS and on Ubuntu 24.04. The tests over SSH have only run on Ubuntu so far.
 
 ## License
 

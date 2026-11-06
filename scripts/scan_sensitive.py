@@ -24,6 +24,10 @@ import zipfile
 
 SF_DATALESS = 0x40000000
 SKIP_DIRS = {".git", "node_modules", "__pycache__"}
+# Credential stores: never read, even as raw bytes. Reported as not searched.
+CREDENTIAL_STORES = re.compile(
+    rb"(^|/)(Library/Keychains|\.local/share/keyrings|\.local/share/kwalletd|\.gnupg|\.password-store)$"
+)
 UNREADABLE_FORMATS = {
     ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".key", ".pages", ".numbers",
     ".jpg", ".jpeg", ".png", ".gif", ".heic", ".tif", ".tiff", ".bmp", ".webp",
@@ -147,7 +151,9 @@ def scan(root, patterns, output, max_size):
             if stat.S_ISLNK(st.st_mode):
                 continue
             if stat.S_ISDIR(st.st_mode):
-                if name in {s.encode() for s in SKIP_DIRS}:
+                if CREDENTIAL_STORES.search(path):
+                    skipped("credential-store", 0, path)
+                elif name in {s.encode() for s in SKIP_DIRS}:
                     skipped("skipped-dir", 0, path)
                 elif getattr(st, "st_flags", 0) & SF_DATALESS:
                     skipped("cloud-placeholder", 0, path)

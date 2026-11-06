@@ -49,16 +49,25 @@ Load the reference for each phase when you reach it.
 
 Platform files: `references/platform-macos.md`, `references/platform-linux.md`. Load the ones for the machines involved.
 
-## Scripts
+## Scripts do the facts
 
-Run with `python3`, on the machine that holds the files. They use only the standard library.
+Use `scripts/migrate.py <command>` for anything it covers. Don't write your own copy, archive, delete, or comparison commands, and don't reimplement a check by hand. Scripts give the same result each run and use far fewer tokens. You handle judgment: unclear classification, trade-offs, conflict rules, and talking to the user.
 
-- `scripts/inventory.py`: complete file inventory with hashes. Records unreadable paths and caches instead of skipping them silently.
-- `scripts/compare.py`: classifies every file, fails if the counts don't reconcile, and detects conflicts between sources.
-- `scripts/scan_sensitive.py`: searches names and contents, and reports paths and counts only. Runs a positive control first.
-- `scripts/run-awake.sh`: keeps a machine awake only for the life of one command.
+| Command | Use |
+|---|---|
+| `init`, `status`, `advance` | Create or resume a migration. `status` gives the phase and next step. |
+| `collect`, `inventory` | Read-only facts about a machine |
+| `scan` | Search names and contents. Reports paths and counts, and skips credential stores. |
+| `compare` | Classify every file. Fails if the counts don't reconcile. |
+| `decide` | Record a decision, and render `decisions.md` |
+| `copy --plan` | Dry run by default. `--run` copies, keeps newer files, and verifies by hash. |
+| `archive --plan` | Build under a temporary name, verify every file, and only then replace |
+| `delete --plan` | Dry run by default. Exact paths only. `--verify-archive` checks hashes first. |
+| `record`, `gate` | Record dated evidence, and fail the erase gate if any is missing or stale |
 
-Run `python3 scripts/test_scripts.py` if you change a script or don't trust a result.
+Commands print short summaries and write detail to files, so open a file only when a result needs a decision. Exit codes: 0 ok, 1 failed a check, 2 bad input or incomplete data. A non-zero exit is never "looks fine".
+
+Plans need `"approved_by_user": true` to run. Set it only after the user has seen that plan and approved it. Use `scripts/run-awake.sh <command>` for long jobs, including downloads. `python3 scripts/test_scripts.py` and `python3 scripts/test_migrate.py` test the scripts.
 
 ## Working with the user
 

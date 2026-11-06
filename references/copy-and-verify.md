@@ -1,6 +1,17 @@
 # Phase 4: Copy and verify
 
-Copy one stage at a time, and verify it before starting the next.
+Copy one stage at a time, and verify it before starting the next. Use `migrate.py copy`, which avoids the traps below and verifies every file by hash.
+
+```json
+{"source": "user@old-mac:/Users/me", "dest": "/Users/me", "items": ["Documents", "#notes.txt"], "approved_by_user": true}
+```
+
+```sh
+python3 migrate.py copy --plan stage-1.json        # dry run
+python3 migrate.py copy --plan stage-1.json --run  # copy and verify
+```
+
+Exit 0 means every planned file is at the destination with the same hash. Different files are never overwritten; they're reported for review. Read `stage-1.json.result.json` only if the result isn't clean.
 
 ## Before copying
 
@@ -10,6 +21,8 @@ Copy one stage at a time, and verify it before starting the next.
 - Use `scripts/run-awake.sh` for anything long, on both ends.
 
 ## Known traps
+
+For anything `migrate.py copy` can't handle, and so you recognize these in a user's own scripts:
 
 | Trap | What happens | What to do |
 |---|---|---|
@@ -44,6 +57,8 @@ It writes `summary.json` and `classified.tsv`, and exits non-zero if the counts 
 | `type-mismatch` | File versus folder or link | Investigate |
 
 `empty_dirs_at_dest` lists folders with contents on the source but none at the destination. This is the signature of a copy that silently failed, so resolve every entry.
+
+Report distinct content as well as file counts. Many duplicates can make something look bigger than it is, and look inside a folder before offering it as a choice.
 
 Mapping decisions onto results is a judgment call. Report what remains, and don't round a large `different` or `missing` count down to "looks fine".
 

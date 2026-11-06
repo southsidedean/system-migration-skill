@@ -19,7 +19,7 @@ Check the end of each run:
 
 ## Collect beyond files
 
-Follow the platform file for exact commands. Cover:
+Run `python3 migrate.py collect --output source-a.json` on each machine. Use the platform file for anything it doesn't cover:
 - Installed apps, packages, and versions, including language-level tools
 - Services, scheduled jobs, startup items
 - Shell config, dotfiles, editor settings and extensions, SSH config, and known hosts

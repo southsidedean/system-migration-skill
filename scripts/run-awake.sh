@@ -6,9 +6,11 @@
 
 if command -v caffeinate >/dev/null 2>&1; then
   exec caffeinate -i "$@"
-elif command -v systemd-inhibit >/dev/null 2>&1; then
+elif command -v systemd-inhibit >/dev/null 2>&1 &&
+  systemd-inhibit --what=idle:sleep --who=system-migration --why="migration job" true >/dev/null 2>&1; then
   exec systemd-inhibit --what=idle:sleep --who=system-migration --why="migration job" "$@"
 else
-  echo "run-awake.sh: no keep-awake tool found; running without one" >&2
+  # A missing or refused inhibitor must not stop the job, so warn and carry on.
+  echo "run-awake.sh: no usable keep-awake tool; running without one, so check sleep settings" >&2
   exec "$@"
 fi

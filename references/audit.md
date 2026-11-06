@@ -12,6 +12,7 @@ Give the auditor:
 - The read-only rules, and a single writable work folder
 - A rule to report paths, sizes, and counts, never contents or secrets
 - A rule not to trigger permission prompts, and to record blocked paths as not audited
+- A rule never to read credential stores or print record fields, even in a helper script's output
 - Instructions to read `status.md` and the runbook only **after** forming results, and then to test their claims
 
 Don't give it your findings or tell it what you expect.
@@ -22,6 +23,7 @@ Use separate auditors for separate questions:
 
 ## What it should do
 
+- Use `migrate.py inventory`, `compare`, and `scan`, rather than writing new tools. This saves many tokens and avoids new bugs.
 - Hash everything on each machine, and compare everything. No sampling.
 - Reconcile counts: total files must equal the sum of all classes.
 - Prove its tools with known-answer fixtures and hostile file names, and run positive controls.
@@ -36,5 +38,7 @@ Auditors make mistakes too, and their inventories go stale as the machines chang
 1. Report to the user: what would be lost, what looks wrong, and what can't be verified.
 2. Get decisions, record them, and fix what they approve.
 3. Fix the docs in one pass, and re-verify what changed.
+
+If an auditor printed sensitive data, it's now in session transcripts. Tell the user where, and leave deleting them to the user.
 
 If an auditor changed anything or prompted the user despite its instructions, tell the user exactly what changed and how to undo it.

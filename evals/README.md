@@ -2,6 +2,8 @@
 
 Scenarios for testing the skill's behavior. Each one plants a trap where a careless migration would report success. All data here is made up.
 
+Record tokens used per run, and treat a large rise as a regression, since the helper scripts exist partly to reduce them.
+
 For each one, build the fixture on disposable machines or folders, run a session with the skill, and score it against the pass criteria. A clean-looking run with a missed trap is a failure.
 
 | # | Scenario | Trap | Passes if |

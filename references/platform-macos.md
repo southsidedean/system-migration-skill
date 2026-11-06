@@ -8,6 +8,7 @@ Protected folders can refuse command-line access with `Operation not permitted`,
 
 - Record blocked paths as NOT VERIFIED.
 - A read of app preferences can trigger a permission dialog on screen, and if approved, it changes privacy settings. Warn the user first.
+- `chmod` can also be blocked on those folders. Finder's Get Info > Sharing & Permissions may still work, so give the user those steps.
 - Full Disk Access is the user's choice. Offer it, explain what it grants, and accept "no". Without it, Finder can usually still copy these folders by hand, or archive them on the source and unpack at the destination.
 
 ## Inventory

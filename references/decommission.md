@@ -4,7 +4,15 @@ Erasing a source can't be undone. This gate runs separately for each source, rig
 
 ## Confirm each one against the current state
 
-Mark each as **pass**, **fail**, or **user accepted the risk**. Don't reuse old results.
+Don't reuse old results. Record each check, then run the gate, which fails on missing or stale evidence:
+
+```sh
+python3 migrate.py record --dir . --source old-mac --kind final-compare --status pass --file compare/summary.json
+python3 migrate.py record --dir . --source old-mac --kind git-clean --status accepted-risk --note "user keeps these changes"
+python3 migrate.py gate --dir . --source old-mac --source-changed 2026-01-31T10:00:00-06:00
+```
+
+Kinds: `final-compare`, `final-backup`, `credentials-retested`, `secrets-reviewed`, `git-clean`, `local-app-data-checked`, `archives-verified`, `licenses-and-accounts`. Only record `pass` after actually checking. The checklist below says what each covers.
 
 **Data**
 - [ ] A final inventory and comparison ran after the source's last use, with every remaining `missing` item decided

@@ -31,6 +31,8 @@ DEFAULT_EXCLUDES = [
     "Library/Caches", ".cache", ".npm/_cacache",
     "Library/Developer/Xcode/DerivedData", "Library/Developer/CoreSimulator/Caches",
     "go/pkg/mod/cache", "*/__pycache__", "__pycache__",
+    # Credential stores are counted but never opened, even to hash them.
+    "Library/Keychains", ".local/share/keyrings", ".local/share/kwalletd", ".gnupg", ".password-store",
 ]
 
 

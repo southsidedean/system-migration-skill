@@ -94,6 +94,14 @@ class InventoryTests(Base):
         self.assertEqual(len(excluded), 1)
         self.assertEqual(excluded[0].split("\t")[5], "1")
 
+    def test_credential_store_is_counted_not_hashed(self):
+        write(self.src, "Library/Keychains/login.keychain-db")
+        out = self.inventory(self.src, "s.tsv")
+        with open(out) as handle:
+            rows = handle.read().splitlines()
+        self.assertTrue(any(r.startswith("x\t") and "Keychains" in r for r in rows))
+        self.assertFalse(any(r.startswith("f\t") and "login.keychain" in r for r in rows))
+
     @unittest.skipIf(os.geteuid() == 0, "root can read anything")
     def test_unreadable_is_recorded_not_skipped(self):
         write(self.src, "locked/secret.txt")
@@ -251,6 +259,14 @@ class ScanTests(Base):
         _, text = self.scan("unused-term")
         self.assertIn("builtin:secret-filename", text)
         self.assertIn("builtin:private-key", text)
+
+    def test_credential_stores_are_never_read(self):
+        for store in ("Library/Keychains", ".gnupg", ".local/share/keyrings"):
+            write(self.src, store + "/login.db", b"examplecustomer")
+        write(self.src, "plain.txt", b"examplecustomer")
+        _, text = self.scan("examplecustomer")
+        self.assertEqual(text.count("match\tcontent"), 1)
+        self.assertEqual(text.count("not-searched\tcredential-store"), 3)
 
     def test_empty_terms_refused(self):
         path = os.path.join(self.tmp, "terms.txt")
