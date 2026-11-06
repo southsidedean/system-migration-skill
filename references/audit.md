@@ -7,6 +7,7 @@ Earlier checks were done by whoever did the work. An audit tests that work, so i
 Use a subagent if your environment has them, and tell the user that this may take a long time and use significant tokens. If not, start a fresh session with only the brief below.
 
 Give the auditor:
+
 - The user's original requirements, in their words, and `decisions.md`
 - Machine names and how to reach them
 - The read-only rules, and a single writable work folder
@@ -18,6 +19,7 @@ Give the auditor:
 Don't give it your findings or tell it what you expect.
 
 Use separate auditors for separate questions:
+
 1. **Completeness:** every file, app, package, and setting, source against destination.
 2. **Sensitive data:** content search across every machine, plus full verification of every archive, member by member.
 

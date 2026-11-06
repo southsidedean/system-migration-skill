@@ -70,6 +70,16 @@ class CopyTests(Base):
         self.assertEqual(result.returncode, OK, result.stdout + result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.dst, "#hash name.txt")))
 
+    def test_item_rsync_drops_is_recovered_without_overwriting(self):
+        # A name rsync's list can't carry: "./" plus a newline makes rsync look for the wrong path.
+        write(self.src, "new\nline.txt", b"from source")
+        write(self.src, "folder/kept.txt", b"from source")
+        write(self.dst, "folder/kept.txt", b"newer destination")
+        result = migrate("copy", "--plan", self.copy_plan(["new\nline.txt", "folder"]), "--run")
+        self.assertTrue(os.path.exists(os.path.join(self.dst, "new\nline.txt")), result.stdout + result.stderr)
+        with open(os.path.join(self.dst, "folder/kept.txt"), "rb") as handle:
+            self.assertEqual(handle.read(), b"newer destination")
+
     def test_newer_destination_file_is_kept_and_reported(self):
         write(self.src, "a.txt", b"from source")
         write(self.dst, "a.txt", b"newer destination")

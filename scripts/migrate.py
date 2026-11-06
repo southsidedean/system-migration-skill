@@ -395,6 +395,41 @@ def compare_trees(source, dest):
     return missing, different
 
 
+def retry_with_tar(plan, items):
+    """Copy items through a tar stream, for names rsync's list handling drops.
+
+    macOS's rsync drops a "./#name" line in --files-from over SSH, and still exits 0. Names go
+    over stdin here, so nothing has to survive a shell. -k keeps existing destination files.
+    """
+    host, base = split_location(plan["source"])
+    if host:
+        sender = ["ssh", "-o", "BatchMode=yes", host, "COPYFILE_DISABLE=1 tar --null -cf - -C %s -T -" % shlex_quote(base)]
+        env = None
+    else:
+        sender = ["tar", "--null", "-cf", "-", "-C", base, "-T", "-"]
+        env = dict(os.environ, COPYFILE_DISABLE="1")
+    with tempfile.TemporaryFile() as names:
+        names.write("".join("./%s\0" % item.rstrip("/") for item in items).encode())
+        names.seek(0)
+        send = subprocess.Popen(sender, stdin=names, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env)
+        unpack = subprocess.run(["tar", "-xkf", "-", "-C", plan["dest"]], stdin=send.stdout,
+                                capture_output=True, check=False)
+        if send.stdout is not None:
+            send.stdout.close()
+        send.wait()
+    return send.returncode == 0 and unpack.returncode == 0
+
+
+def owning_items(plan_items, paths):
+    """The plan items that contain any of these paths."""
+    found = []
+    for item in plan_items:
+        root = item.rstrip("/")
+        if any(path == root or path.startswith(root + "/") for path in paths):
+            found.append(item)
+    return found
+
+
 def cmd_copy(args):
     plan = load_plan(args.plan, ("source", "dest", "items"))
     if args.run:
@@ -432,13 +467,27 @@ def cmd_copy(args):
     source = run_tree(plan["source"], plan["items"])
     dest = run_tree(plan["dest"], [i for i in plan["items"] if os.path.lexists(os.path.join(plan["dest"], i))])
     missing, different = compare_trees(source, dest)
+    recovered = []
+    if missing:
+        recovered = owning_items(plan["items"], missing)
+        retry_with_tar(plan, recovered)
+        dest = run_tree(plan["dest"], [i for i in plan["items"] if os.path.lexists(os.path.join(plan["dest"], i))])
+        still_missing, different = compare_trees(source, dest)
+        recovered = [item for item in recovered if not owning_items([item], still_missing)]
+        missing = still_missing
     report = {"date": now(), "source_entries": len(source["entries"]), "missing": missing, "different": different,
+              "recovered_with_tar": recovered,
               "source_errors": source["errors"], "dest_errors": dest["errors"]}
     report_path = (args.report or args.plan + ".result.json")
     save_json(report_path, report)
     files = sum(1 for e in source["entries"].values() if e[0] == "f")
     print("source_entries=%d files=%d missing=%d different=%d unreadable=%d report=%s" % (
         len(source["entries"]), files, len(missing), len(different), len(source["errors"]) + len(dest["errors"]), report_path))
+    if recovered:
+        print("rsync dropped %d item(s) while exiting 0. Copied with tar, then verified: %s" % (len(recovered), ", ".join(recovered[:5])))
+    for label, names in (("missing", missing), ("different", different)):
+        if names:
+            print("%s: %s%s" % (label, ", ".join(names[:5]), " (and %d more)" % (len(names) - 5) if len(names) > 5 else ""))
     if different:
         print("Different files weren't overwritten; the destination kept its version. Review them.")
     if not source["entries"]:
@@ -467,13 +516,13 @@ def cmd_archive(args):
         print("the source listed nothing", file=sys.stderr)
         return FAILED
 
-    tar = ["tar", "-czf", "-", "-C", base, "-T", "-"]
+    tar = ["tar", "--null", "-czf", "-", "-C", base, "-T", "-"]
     if host:
-        command = ["ssh", "-o", "BatchMode=yes", host, "COPYFILE_DISABLE=1 tar -czf - -C %s -T -" % shlex_quote(base)]
+        command = ["ssh", "-o", "BatchMode=yes", host, "COPYFILE_DISABLE=1 tar --null -czf - -C %s -T -" % shlex_quote(base)]
         env = None
     else:
         command, env = tar, dict(os.environ, COPYFILE_DISABLE="1")
-    listing = "".join(item + "\n" for item in plan["items"]).encode()
+    listing = "".join(item + "\0" for item in plan["items"]).encode()
     digest = hashlib.sha256()
     with tempfile.TemporaryFile() as stdin, open(partial, "wb") as out:
         stdin.write(listing)

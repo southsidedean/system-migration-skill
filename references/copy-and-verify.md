@@ -27,7 +27,7 @@ For anything `migrate.py copy` can't handle, and so you recognize these in a use
 | Trap | What happens | What to do |
 |---|---|---|
 | `rsync --files-from` | `-a` no longer implies `-r`, so listed folders arrive empty and it still exits 0 | Add `-r`, then verify |
-| `#` or `;` starting a line in a files-from list | Treated as a comment and silently dropped, still with exit 0 | Prefix each path with `./`. This has worked in local copies, but it has been seen to fail over SSH, so verify, and copy any dropped file separately |
+| `#` or `;` starting a line in a files-from list | Treated as a comment and silently dropped, still with exit 0. On macOS, `./#name` is also dropped over SSH, though it works locally. | `migrate.py copy` retries anything missing through a `tar` stream, and then verifies. Elsewhere, verify and copy dropped files separately. |
 | rsync without `--ignore-existing` on a re-run | Overwrites newer files at the destination | Don't call a copy script safe to re-run once the destination is in use. Re-run with `--ignore-existing` or `--update`. |
 | Unquoted paths in remote commands | Spaces, unicode, or `#` split or truncate arguments | Use NUL-delimited lists or pipe a script over stdin |
 | `ssh` in a loop or script | Reads the script's stdin | Use `ssh -n` unless deliberately piping |
