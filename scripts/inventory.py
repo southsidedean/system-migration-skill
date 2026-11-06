@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only file inventory with SHA-256 hashes. Python 3.8+, standard library only.
+"""Read-only file inventory with SHA-256 hashes. Python 3.9+, standard library only.
 
   inventory.py --root home=$HOME --root apps=/Applications --output source-a.tsv
 

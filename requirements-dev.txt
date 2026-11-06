@@ -1,0 +1,6 @@
+# Development tools, pinned. The skill itself needs only Python.
+ruff==0.17.1
+bandit==1.9.4
+mypy==2.4.0
+zizmor==1.31.1
+codespell==2.4.3

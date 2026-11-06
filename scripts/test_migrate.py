@@ -315,6 +315,12 @@ class StateAndGateTests(Base):
         self.assertIn("Old\\|Work", text)
         self.assertIn("D1", text)
 
+    def test_init_refuses_a_folder_that_is_in_use(self):
+        write(self.dir, "someone-elses-plan.json", b"{}")
+        result = migrate("init", "--dir", self.dir, "--shape", "absorb", "--source", "a", "--dest", "b")
+        self.assertNotEqual(result.returncode, OK)
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "state.json")))
+
     def test_init_refuses_to_overwrite(self):
         self.init()
         self.assertNotEqual(migrate("init", "--dir", self.dir, "--shape", "absorb", "--source", "a", "--dest", "b").returncode, OK)

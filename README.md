@@ -45,7 +45,7 @@ Then ask Claude something like "Help me migrate from my old Mac to my new one."
 
 ## Development
 
-The scripts need Python 3.8 or later and nothing else.
+The scripts need Python 3.9 or later and nothing else.
 
 ```sh
 python3 scripts/test_scripts.py

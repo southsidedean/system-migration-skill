@@ -1,0 +1,29 @@
+# Settings for the development tools only. The skill itself has no dependencies.
+[tool.ruff]
+line-length = 130
+target-version = "py39"
+
+[tool.ruff.lint]
+# Rules that find bugs and risky code, not style.
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM", "PERF", "S", "PLE", "PLW", "RUF"]
+ignore = [
+    "S603",   # subprocess calls with argument lists (no shell) are how these scripts work
+    "S607",   # tools such as rsync are found on PATH, as a user's shell would find them
+    "UP031",  # percent formatting is fine here
+    "RUF005", # list concatenation is fine here
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, use temporary paths, and plant fake secrets on purpose.
+"scripts/test_*.py" = ["S101", "S103", "S105", "S106", "S108", "PLW1510"]
+"evals/*.py" = ["S101", "S105", "S106", "PLW1510"]
+
+[tool.bandit]
+exclude_dirs = ["scripts/test_scripts.py", "scripts/test_migrate.py", "evals"]
+# Same reasons as the ruff ignores above.
+skips = ["B404", "B603", "B607"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["scripts/migrate.py", "scripts/compare.py", "scripts/inventory.py", "scripts/scan_sensitive.py", "scripts/validate_skill.py"]
+check_untyped_defs = true

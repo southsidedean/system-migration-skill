@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare inventories from inventory.py. Python 3.8+, standard library only.
+"""Compare inventories from inventory.py. Python 3.9+, standard library only.
 
   compare.py --source a.tsv --dest b.tsv --output compare-a
   compare.py --conflicts a.tsv b.tsv c.tsv --output conflicts
@@ -27,15 +27,15 @@ def load(path):
     end = None
     with open(path, encoding="ascii") as handle:
         for line in handle:
-            line = line.rstrip("\n")
-            if line.startswith("#END\t"):
-                end = json.loads(line.split("\t", 1)[1])
-            elif line.startswith("#") or not line:
+            text = line.rstrip("\n")
+            if text.startswith("#END\t"):
+                end = json.loads(text.split("\t", 1)[1])
+            elif text.startswith("#") or not text:
                 continue
             else:
-                fields = line.split("\t")
+                fields = text.split("\t")
                 if len(fields) != 8:
-                    raise SystemExit("%s: malformed line: %r" % (path, line[:120]))
+                    raise SystemExit("%s: malformed line: %r" % (path, text[:120]))
                 typ, status, size, _mode, _mtime, sha, _link, key = fields
                 entries[key] = (typ, status, int(size), sha)
     if end is None:
@@ -56,7 +56,7 @@ def hashable(entry):
 
 def classify(source, dest):
     blocked = {k for k, e in dest.items() if e[1].startswith("err:") or e[1] in ("dataless", "mount", "excluded")}
-    hashes = {}
+    hashes: dict = {}
     for key, entry in dest.items():
         if hashable(entry):
             hashes.setdefault(entry[3], key)
@@ -146,7 +146,7 @@ def run_compare(args):
 
 
 def run_conflicts(args):
-    seen = collections.defaultdict(dict)
+    seen: dict = collections.defaultdict(dict)
     for path in args.conflicts:
         entries, _ = load(path)
         label = os.path.basename(path)

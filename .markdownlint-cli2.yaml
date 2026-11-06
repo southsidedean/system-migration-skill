@@ -1,0 +1,6 @@
+config:
+  MD013: false # line length: prose paragraphs are single lines
+  MD024:
+    siblings_only: true # each CHANGELOG release has its own New and Fixes
+  MD033: false # inline HTML
+  MD036: false # steps are labeled in bold

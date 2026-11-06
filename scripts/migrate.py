@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic helpers for system migrations. Python 3.8+, standard library only.
+"""Deterministic helpers for system migrations. Python 3.9+, standard library only.
 
 Commands print a short summary, write detail to files, and use fixed exit codes:
   0 ok   1 failed a check   2 bad input or incomplete data
@@ -105,6 +105,15 @@ json.dump(out, sys.stdout)
 '''
 
 
+def hash_stream(stream):
+    """SHA-256 of an open binary stream."""
+    digest = hashlib.sha256()
+    if stream is not None:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest
+
+
 def now():
     return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
@@ -124,7 +133,7 @@ def run_tree(location, items, delete=False):
         command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=20", host, "python3", "-", payload]
     else:
         command = [sys.executable, "-", payload]
-    done = subprocess.run(command, input=TREE_SCRIPT, capture_output=True, text=True)
+    done = subprocess.run(command, input=TREE_SCRIPT, capture_output=True, text=True, check=False)
     if done.returncode != 0:
         raise SystemExit("couldn't reach %s: %s" % (location, done.stderr.strip()[:300]))
     return json.loads(done.stdout)
@@ -135,9 +144,9 @@ def load_json(path, label="file"):
         with open(path, encoding="utf-8") as handle:
             return json.load(handle)
     except FileNotFoundError:
-        raise SystemExit("%s not found: %s" % (label, path))
+        raise SystemExit("%s not found: %s" % (label, path)) from None
     except ValueError as exc:
-        raise SystemExit("%s isn't valid JSON: %s (%s)" % (label, path, exc))
+        raise SystemExit("%s isn't valid JSON: %s (%s)" % (label, path, exc)) from None
 
 
 def save_json(path, data):
@@ -185,9 +194,11 @@ def load_state(folder):
 # --- init, status, advance
 
 def cmd_init(args):
-    os.makedirs(args.dir, exist_ok=True)
     if os.path.exists(state_path(args.dir)):
-        raise SystemExit("already initialized: %s. Use `status`." % args.dir)
+        raise SystemExit("already initialized: %s. Use `status`, or pick another folder for a different migration." % args.dir)
+    if os.path.isdir(args.dir) and os.listdir(args.dir):
+        raise SystemExit("folder isn't empty and has no migration in it: %s. Pick a new folder." % args.dir)
+    os.makedirs(args.dir, exist_ok=True)
     save_json(state_path(args.dir), {
         "shape": args.shape, "phase": 1, "sources": args.source, "destination": args.dest,
         "created": now(), "evidence": [],
@@ -238,8 +249,9 @@ def render_decisions(folder, decisions):
 def cmd_decide(args):
     path = os.path.join(args.dir, "decisions.json")
     data = load_json(path, "decisions")
+    is_secret = args.secret == "yes"  # noqa: S105  # nosec B105
     entry = {"id": "D%d" % (len(data["decisions"]) + 1), "date": now(), "source": args.source, "item": args.item,
-             "owner": args.owner, "secret": args.secret == "yes", "action": args.action, "reason": args.reason or ""}
+             "owner": args.owner, "secret": is_secret, "action": args.action, "reason": args.reason or ""}
     data["decisions"].append(entry)
     save_json(path, data)
     render_decisions(args.dir, data["decisions"])
@@ -348,7 +360,7 @@ LINUX = {
 def cmd_collect(args):
     table = dict(COMMON)
     table.update(MACOS if platform.system() == "Darwin" else LINUX)
-    results = {}
+    results: dict = {}
     absent = failed = 0
     for name, command in sorted(table.items()):
         if not shutil.which(command[0]):
@@ -357,7 +369,7 @@ def cmd_collect(args):
             continue
         try:
             done = subprocess.run(command, capture_output=True, text=True, errors="replace",
-                                  timeout=args.timeout, stdin=subprocess.DEVNULL)
+                                  timeout=args.timeout, stdin=subprocess.DEVNULL, check=False)
             results[name] = {"status": "ok" if done.returncode == 0 else "exit-%d" % done.returncode,
                              "output": done.stdout.splitlines()}
             failed += done.returncode != 0
@@ -403,7 +415,7 @@ def cmd_copy(args):
     command = ["rsync", "-a", "-r", "--ignore-existing", "--files-from=" + listing, src, plan["dest"].rstrip("/") + "/"]
     try:
         if not args.run:
-            done = subprocess.run(command[:1] + ["-n", "-v"] + command[1:], capture_output=True, text=True, errors="replace")
+            done = subprocess.run(command[:1] + ["-n", "-v"] + command[1:], capture_output=True, text=True, errors="replace", check=False)
             if done.returncode != 0:
                 print(done.stderr[:500], file=sys.stderr)
                 return FAILED
@@ -412,7 +424,7 @@ def cmd_copy(args):
             if not names:
                 print("It lists nothing, which proves nothing. Check the plan, or whether everything already exists.")
             return OK
-        done = subprocess.run(command, capture_output=True, text=True, errors="replace")
+        done = subprocess.run(command, capture_output=True, text=True, errors="replace", check=False)
     finally:
         os.unlink(listing)
     if done.returncode != 0:
@@ -467,10 +479,13 @@ def cmd_archive(args):
         stdin.write(listing)
         stdin.seek(0)
         proc = subprocess.Popen(command, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-        for chunk in iter(lambda: proc.stdout.read(1 << 20), b""):
+        while proc.stdout is not None:
+            chunk = proc.stdout.read(1 << 20)
+            if not chunk:
+                break
             digest.update(chunk)
             out.write(chunk)
-        errors = proc.stderr.read().decode(errors="replace")
+        errors = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
         proc.wait()
 
     def fail(message):
@@ -481,9 +496,7 @@ def cmd_archive(args):
     if proc.returncode != 0:
         return fail("tar exit %d: %s" % (proc.returncode, errors[:300]))
     with open(partial, "rb") as handle:
-        back = hashlib.sha256()
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            back.update(chunk)
+        back = hash_stream(handle)
     if back.hexdigest() != digest.hexdigest():
         return fail("the read-back hash doesn't match the stream")
     members = {}
@@ -495,12 +508,9 @@ def cmd_archive(args):
             kind = "d" if member.isdir() else "l" if member.issym() else "f" if member.isfile() else "o"
             members[key] = kind
             if kind == "f":
-                data = archive.extractfile(member)
-                sha = hashlib.sha256()
-                for chunk in iter(lambda: data.read(1 << 20), b""):
-                    sha.update(chunk)
+                member_hash = hash_stream(archive.extractfile(member)).hexdigest()
                 expected = source["entries"].get(key)
-                if expected is None or expected[0] != "f" or expected[2] != sha.hexdigest():
+                if expected is None or expected[0] != "f" or expected[2] != member_hash:
                     return fail("member differs from the source: %s" % key)
     absent = [rel for rel in source["entries"] if rel not in members]
     if absent:
@@ -519,10 +529,10 @@ def cmd_archive(args):
                 outside.append([rel, entry[1]])
     os.replace(partial, final)
     sha = back.hexdigest()
-    with open(final + ".sha256", "w", encoding="utf-8") as handle:
-        handle.write("%s  %s\n" % (sha, os.path.basename(final)))
-    with open(os.path.join(dest_dir, name + ".filelist.txt"), "w", encoding="utf-8", errors="surrogateescape") as handle:
-        handle.write("".join(key + "\n" for key in sorted(members)))
+    with open(final + ".sha256", "w", encoding="utf-8") as sha_file:
+        sha_file.write("%s  %s\n" % (sha, os.path.basename(final)))
+    with open(os.path.join(dest_dir, name + ".filelist.txt"), "w", encoding="utf-8", errors="surrogateescape") as list_file:
+        list_file.write("".join(key + "\n" for key in sorted(members)))
     save_json(os.path.join(dest_dir, name + ".manifest.json"), {
         "name": name, "created": now(), "source": plan["source"], "items": plan["items"], "sha256": sha,
         "size": os.path.getsize(final), "entries": len(members), "encrypted": False,
@@ -546,11 +556,7 @@ def archive_hashes(path):
     with tarfile.open(path, "r:*") as archive:
         for member in archive:
             if member.isfile():
-                data = archive.extractfile(member)
-                sha = hashlib.sha256()
-                for chunk in iter(lambda: data.read(1 << 20), b""):
-                    sha.update(chunk)
-                hashes[member.name] = sha.hexdigest()
+                hashes[member.name] = hash_stream(archive.extractfile(member)).hexdigest()
     return hashes
 
 

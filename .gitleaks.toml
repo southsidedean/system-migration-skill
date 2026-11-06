@@ -1,0 +1,7 @@
+# Default rules, plus the fake values the tests plant on purpose.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fake secrets planted by tests and eval fixtures"
+paths = ['''scripts/test_.*\.py''', '''evals/.*\.py''']

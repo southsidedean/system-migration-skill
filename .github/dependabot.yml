@@ -1,0 +1,22 @@
+# Keeps the actions in .github/workflows, pinned to exact commits, and the pinned dev tools up to date.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # One pull request for all of them, and only for releases at least a week old.
+    groups:
+      actions:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      dev-tools:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7

@@ -1,0 +1,8 @@
+# Link checker settings for the links workflow.
+max_retries = 3
+timeout = 30
+accept = ["200..=299", "429"]
+exclude = [
+    # Addresses in sample commands, not real links.
+    "^https?://(localhost|127\\.0\\.0\\.1|192\\.168\\.)",
+]

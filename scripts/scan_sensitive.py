@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Search names and contents for terms. Reports paths and counts, never matching text.
-Python 3.8+, standard library only.
+Python 3.9+, standard library only.
 
   scan_sensitive.py --root $HOME --terms terms.txt --output scan.tsv
 
@@ -57,7 +57,7 @@ def compile_terms(terms):
 
 def count_content(path, patterns, chunk_size=1 << 20, overlap=256):
     """Count matches across chunks. Returns None if the file looks binary."""
-    counts = {}
+    counts: dict = {}
     previous = b""
     with open(path, "rb", buffering=0) as handle:
         first = True
@@ -222,11 +222,10 @@ def main():
             parser.error("root isn't a folder: %s" % root)
 
     tmp = args.output + ".partial"
-    results = []
+    results: list = []
     with open(tmp, "w", encoding="ascii") as out:
         out.write("kind\tlocation\tterm\tcount\tsize\tpath\n")
-        for root in args.root:
-            results.append(scan(root, patterns, out, args.max_size_mb << 20))
+        results.extend(scan(root, patterns, out, args.max_size_mb << 20) for root in args.root)
     os.replace(tmp, args.output)
     print(json.dumps({"self_test": "passed", "terms": len(terms), "roots": args.root, "results": results}))
     if not any(r["files_seen"] for r in results):

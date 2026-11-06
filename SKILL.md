@@ -22,9 +22,22 @@ Supported: macOS and Linux. Windows isn't supported yet; say so rather than impr
 9. **The source stays intact until the final gate** in Phase 7. Anything that changes it earlier gets recorded in the status doc.
 10. **Keep the docs true.** Update `status.md` in the same step as the work, and re-check its claims before relying on them.
 
-## Start or resume
+## Size the job first
 
-Ask for or find the migration folder, default `~/migration-<YYYY-MM>/`. If it contains `status.md`, read it and `decisions.md`, re-verify the current state, summarize it, and continue. Otherwise create it from `templates/`.
+Match the process to the request, and don't run phases nobody needs.
+
+- **Small job:** one copy, delete, check, or archive that the user has already scoped and approved. Skip the migration folder, phases, and scan. Write the plan to a temporary folder, use the one `migrate.py` command with its dry run, and report the result. If the data might be sensitive, or the request grows, say so and move to a full migration.
+- **Full migration:** moving, merging, or retiring a machine. Use the phases below.
+
+The rules above apply to both.
+
+## Start or resume a full migration
+
+Before writing anything, look for an existing migration. Each migration has its own folder, named for it: `~/migration-<name>-<YYYY-MM>/`, such as `~/migration-old-laptop-2026-11/`. Keep all its plans and output inside that folder.
+
+- **Folder has `state.json`, and it's this migration:** run `migrate.py status --dir <folder>`, read `decisions.md`, re-verify the current state, summarize it, and continue.
+- **Folder is someone else's, or unrelated:** leave it alone, and use a new name.
+- **No folder:** run `migrate.py init`. It refuses a folder that's in use.
 
 Ask only what you need to start:
 - **Shape:** one-to-one, many-to-one, or absorbing another system into one already in use. See `references/topologies.md`.

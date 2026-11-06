@@ -1,0 +1,141 @@
+name: tests
+
+# The checks every pull request must pass before it can merge. scripts/check.sh runs the
+# same checks locally. No job here uses tokens, secrets, or a Claude session; full eval
+# sessions run by hand (evals/README.md).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Weekly, so a new tool, runner, or Python release that breaks something shows up even in a quiet week.
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request replaces the older run. Each push to main gets its own.
+concurrency:
+  group: tests-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # 3.9 is what Apple's Command Line Tools install, so it's the oldest supported.
+        python: ["3.9", "3.x"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: rsync on this runner
+        run: rsync --version | head -1
+      - name: script tests
+        run: python scripts/test_scripts.py
+      # SSH back to this runner, so copy, archive, and delete run over a real connection,
+      # with whichever rsync this OS ships.
+      - name: set up SSH to this runner
+        run: sh scripts/ci-ssh-setup.sh
+      - name: migrate tests, including over SSH
+        run: python scripts/test_migrate.py
+        env:
+          MIGRATE_TEST_HOST: runner@127.0.0.1
+      - name: eval fixtures
+        run: python evals/test_evals.py
+
+  lint:
+    name: lint and security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: ruff (bugs and risky code; settings in pyproject.toml)
+        run: python -m ruff check scripts evals
+      - name: bandit (security problems)
+        run: python -m bandit -q -c pyproject.toml -r scripts
+      - name: mypy (types)
+        run: python -m mypy
+      # shellcheck comes with the runner.
+      - name: shellcheck
+        run: shellcheck -s sh scripts/*.sh
+      - name: the skill is well formed
+        run: python scripts/validate_skill.py
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: markdownlint (settings in .markdownlint-cli2.yaml)
+        uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
+        with:
+          globs: "**/*.md"
+      - name: codespell (settings in .codespellrc)
+        uses: codespell-project/actions-codespell@e3258cca84ce02b0bb36a3d41f2c18f719a0cc1a # v2.4.3
+
+  secrets:
+    name: secrets and stray output
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # gitleaks reads the full history
+      # Pinned to a release, and checked against that release's published checksum.
+      - name: gitleaks (settings in .gitleaks.toml)
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/gitleaks.tgz" \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner .
+      # Migration output names real files, so it must never reach this public repo.
+      - name: no migration output in the repo
+        run: |
+          if git ls-files | grep -E '(^|/)(state\.json|decisions\.json|terms[^/]*\.txt|migration-[^/]*/.*)$|\.tsv$'; then
+            echo "Migration output is committed. Remove it." >&2
+            exit 1
+          fi
+
+  workflows:
+    name: workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: zizmor (these workflows' security)
+        run: zizmor --offline --min-severity medium .github/workflows
+      # actionlint, pinned to a release and checked against that release's published checksum.
+      - name: actionlint (mistakes in these workflows)
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/actionlint.tgz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint"
