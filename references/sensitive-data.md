@@ -29,9 +29,11 @@ Names aren't reliable. For example, a folder called `Insurance` might hold a cus
 1. Ask what past employers, clients, and regulated work the machine has seen. Offer to skip this if they'd rather not say.
 2. Build a terms file, one per line: organization names, product names, email domains, and ticket formats. Terms stay in the migration folder, not in anything shared.
 3. Run the scan on each machine:
+
    ```sh
    python3 scan_sensitive.py --root $HOME --terms terms.txt --output scan.tsv
    ```
+
    It skips credential stores, even as raw bytes. Never write your own search that prints matching lines or record fields, because those end up in transcripts.
 4. Read `scan.tsv`, classify results, and discard obvious false positives, saying why. Public learning material mentioning a product isn't the same as a customer's data.
 5. Report `not-searched` entries: PDFs, Office files, images, nested or encrypted archives, and oversized files. Have the user review the ones that matter.

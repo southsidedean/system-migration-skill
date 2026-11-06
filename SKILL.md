@@ -40,6 +40,7 @@ Before writing anything, look for an existing migration. Each migration has its 
 - **No folder:** run `migrate.py init`. It refuses a folder that's in use.
 
 Ask only what you need to start:
+
 - **Shape:** one-to-one, many-to-one, or absorbing another system into one already in use. See `references/topologies.md`.
 - **Machines:** names, OS, how they connect, and which can run commands.
 - **Fate of each source:** keep, repurpose, or erase, and when.
