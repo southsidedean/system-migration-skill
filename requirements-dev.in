@@ -1,0 +1,8 @@
+# Development tools. The skill itself needs only Python.
+# After changing this, regenerate the locked file:
+#   pip-compile --generate-hashes --allow-unsafe --output-file=requirements-dev.txt requirements-dev.in
+ruff==0.17.3
+bandit==1.9.4
+mypy==2.4.1
+zizmor==1.31.1
+codespell==2.4.3

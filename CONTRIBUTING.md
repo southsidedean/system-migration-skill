@@ -8,11 +8,11 @@ Thanks for helping. Bug reports, tested platform notes, and new eval scenarios a
 git clone https://github.com/southsidedean/system-migration-skill
 cd system-migration-skill
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install --require-hashes -r requirements-dev.txt
 scripts/check.sh
 ```
 
-The skill itself needs only Python 3.9 or later. The tools in `requirements-dev.txt` are for checks. `shellcheck` is separate, and comes from your package manager.
+The skill itself needs only Python 3.9 or later. The tools in `requirements-dev.txt` are for checks, locked with hashes. To change them, edit `requirements-dev.in`, and regenerate the locked file with the command at its top. `shellcheck` is separate, and comes from your package manager.
 
 ## Making a change
 

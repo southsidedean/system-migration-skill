@@ -12,6 +12,7 @@ The first version, for macOS and Linux.
 - 16 eval scenarios with planted traps, run on Linux and partly on macOS. See `evals/RESULTS.md`.
 - User guides in `docs/`.
 - CI on macOS and Ubuntu, including copies over real SSH.
+- CI installs its dev tools from a file locked with hashes.
 
 ### Fixes
 
