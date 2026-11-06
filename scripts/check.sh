@@ -1,7 +1,7 @@
 #!/bin/sh
 # The checks CI runs that work on your own machine. Run it before pushing:
 #   scripts/check.sh
-# For the lint tools, use a virtual environment: python3 -m pip install -r requirements-dev.txt
+# For the lint tools, use a virtual environment: python3 -m pip install --require-hashes -r requirements-dev.txt
 # A tool that isn't installed is skipped with a note here; in CI it's a failure.
 set -u
 cd "$(dirname "$0")/.." || exit 2
