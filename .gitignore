@@ -1,0 +1,8 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.partial
+# Migration output must never land in this repo.
+migration-*/
+*.tsv
+terms.txt
