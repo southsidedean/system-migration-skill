@@ -45,7 +45,7 @@ Claude starts by looking, without changing anything. See [Getting started](docs/
 This is an early release. Use it alongside your own backups.
 
 - **Tested:** the scripts run in CI on macOS and Ubuntu, on Python 3.9 and the latest Python, including copies over real SSH connections.
-- **Partly tested:** 3 of the 15 [eval scenarios](evals/README.md) have run as real Claude sessions, once each, on Linux.
+- **Partly tested:** all 15 [eval scenarios](evals/RESULTS.md) have passed as real Claude sessions, once each, on Linux, with small made-up data. They haven't run on macOS yet.
 - **Not yet supported:** Windows, and encrypted archives. To encrypt an archive, use your own tool.
 
 This skill reduces risk, but doesn't remove it. It flags possible contractual or legal concerns about data you hold, but it doesn't give legal advice.
