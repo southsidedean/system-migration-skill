@@ -225,7 +225,7 @@ class CompareTests(Base):
 
 
 class ScanTests(Base):
-    PLANTED_SECRET = "plantedvalue1234567890"
+    PLANTED_VALUE = "plantedvalue1234567890"
 
     def scan(self, *terms):
         path = os.path.join(self.tmp, "terms.txt")
@@ -245,10 +245,10 @@ class ScanTests(Base):
         self.assertEqual(row[0].split("\t")[3], "2")
 
     def test_output_never_contains_the_matching_text(self):
-        write(self.src, "notes.txt", ("examplecustomer token=%s\n" % self.PLANTED_SECRET).encode())
+        write(self.src, "notes.txt", ("examplecustomer token=%s\n" % self.PLANTED_VALUE).encode())
         result, text = self.scan("examplecustomer")
-        self.assertNotIn(self.PLANTED_SECRET, text)
-        self.assertNotIn(self.PLANTED_SECRET, result.stdout + result.stderr)
+        self.assertNotIn(self.PLANTED_VALUE, text)
+        self.assertNotIn(self.PLANTED_VALUE, result.stdout + result.stderr)
         self.assertNotIn("token=", text)
 
     def test_name_match_and_archive_member_name(self):
