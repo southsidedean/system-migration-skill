@@ -439,6 +439,9 @@ def cmd_copy(args):
     files = sum(1 for e in source["entries"].values() if e[0] == "f")
     print("source_entries=%d files=%d missing=%d different=%d unreadable=%d report=%s" % (
         len(source["entries"]), files, len(missing), len(different), len(source["errors"]) + len(dest["errors"]), report_path))
+    for label, names in (("missing", missing), ("different", different)):
+        if names:
+            print("%s: %s%s" % (label, ", ".join(names[:5]), " (and %d more)" % (len(names) - 5) if len(names) > 5 else ""))
     if different:
         print("Different files weren't overwritten; the destination kept its version. Review them.")
     if not source["entries"]:
