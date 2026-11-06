@@ -39,7 +39,7 @@ class Base(unittest.TestCase):
     def tearDown(self):
         for current, dirs, _files in os.walk(self.tmp):
             for name in dirs:
-                os.chmod(os.path.join(current, name), 0o755)
+                os.chmod(os.path.join(current, name), 0o700)
         shutil.rmtree(self.tmp)
 
     def inventory(self, root, name):

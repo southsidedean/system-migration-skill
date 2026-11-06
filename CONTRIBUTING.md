@@ -53,7 +53,7 @@ python3 evals/run_eval.py build 1 /tmp/eval-1
 python3 evals/run_eval.py score 1 /tmp/eval-1 report.txt
 ```
 
-Don't tell the session about the trap or the scoring. Record the tokens each run uses.
+Don't tell the session about the trap or the scoring. Record the tokens each run uses in `evals/RESULTS.md`.
 
 ## Docs
 

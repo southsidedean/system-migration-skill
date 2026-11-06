@@ -9,7 +9,7 @@ The first version, for macOS and Linux.
 - A skill that guides a migration through seven phases, with a lighter path for small jobs.
 - `scripts/migrate.py`: state, decisions, evidence, collection, copying, archiving, deletion, and a final check before erasing.
 - Inventory, comparison, and sensitive-data scan scripts.
-- Eval scenarios with planted traps. 3 of the 15 have fixtures and have been run.
+- 15 eval scenarios with planted traps, each run once on Linux. See `evals/RESULTS.md`.
 - User guides in `docs/`.
 - CI on macOS and Ubuntu, including copies over real SSH.
 

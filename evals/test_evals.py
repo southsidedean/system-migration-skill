@@ -34,7 +34,7 @@ class EvalFixtures(unittest.TestCase):
         return folder
 
     def test_undone_work_fails_every_scenario(self):
-        for number in ("1", "2", "9"):
+        for number in ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"):
             folder = self.build(number)
             self.assertEqual(tool("score", number, folder).returncode, 1, "eval %s" % number)
             shutil.rmtree(folder)
