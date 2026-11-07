@@ -35,6 +35,7 @@ tmutil destinationinfo
 - Photo libraries and some app data refuse command-line writes. Archive on the source, then have the user unpack and place them in Finder.
 - `tar` may store metadata as `._` entries. These count as extra files when compared.
 - Migration Assistant suits moving a whole account onto a fresh machine. Don't suggest it for a machine already in use.
+- Finder can create a `.DS_Store` in a folder when a file arrives there, and it can even match the source's by hash. It doesn't mean the copy brought it, and `report` leaves these out.
 - iCloud can leave "dataless" placeholders. `inventory.py` records these and doesn't read them, to avoid triggering downloads.
 
 ## Apps

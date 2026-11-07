@@ -25,5 +25,5 @@ skips = ["B404", "B603", "B607"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["scripts/migrate.py", "scripts/compare.py", "scripts/inventory.py", "scripts/scan_sensitive.py", "scripts/validate_skill.py"]
+files = ["scripts/migrate.py", "scripts/compare.py", "scripts/inventory.py", "scripts/scan_sensitive.py", "scripts/report.py", "scripts/validate_skill.py"]
 check_untyped_defs = true

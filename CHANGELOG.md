@@ -11,11 +11,16 @@ The first version, for macOS and Linux.
 - Inventory, comparison, and sensitive-data scan scripts.
 - 16 eval scenarios with planted traps, run on Linux and partly on macOS. See `evals/RESULTS.md`.
 - User guides in `docs/`.
+- `discover` runs inventory, collection, and the scan on a machine over SSH, leaving nothing there, including search terms.
+- `report` summarizes discovery, so a session doesn't have to write its own analysis scripts.
 - CI on macOS and Ubuntu, including copies over real SSH.
 - CI installs its dev tools from a file locked with hashes.
 
 ### Fixes
 
+- `collect` finds Homebrew and npm over SSH, without a login shell, and stops npm writing a log file on the source. It also counts Git work that may exist only on that machine.
+- Auditors are told to write nothing on a source, and to send no data between machines.
+- Claude asks for decisions when they come up, rather than listing them and waiting.
 - `copy` recovers files that `rsync` drops. macOS's `rsync` silently drops `./#name` entries in a file list over SSH.
 - `run-awake.sh` no longer stops a job where `systemd-inhibit` isn't allowed.
 - `scan` and `inventory` no longer read credential stores, even as raw bytes.

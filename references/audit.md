@@ -4,7 +4,7 @@ Earlier checks were done by whoever did the work. An audit tests that work, so i
 
 ## Running it
 
-Use a subagent if your environment has them, and tell the user that this may take a long time and use significant tokens. If not, start a fresh session with only the brief below.
+Use a subagent if your environment has them, and tell the user that this may take a long time and use significant tokens: about 200,000 per auditor in testing, even with little data. If not, start a fresh session with only the brief below.
 
 Give the auditor:
 
@@ -12,6 +12,7 @@ Give the auditor:
 - Machine names and how to reach them
 - The read-only rules, and a single writable work folder
 - A rule to report paths, sizes, and counts, never contents or secrets
+- A rule to write nothing on a source, not even a temp file, and to send no data between machines. `discover --dir <work folder>` needs neither.
 - A rule not to trigger permission prompts, and to record blocked paths as not audited
 - A rule never to read credential stores or print record fields, even in a helper script's output
 - Instructions to read `status.md` and the runbook only **after** forming results, and then to test their claims
@@ -25,7 +26,7 @@ Use separate auditors for separate questions:
 
 ## What it should do
 
-- Use `migrate.py inventory`, `compare`, and `scan`, rather than writing new tools. This saves many tokens and avoids new bugs.
+- Use `migrate.py discover`, `report`, and `compare`, rather than writing new tools. This saves many tokens and avoids new bugs. If a question truly needs a new script, keep it in the work folder, and list it in the report.
 - Hash everything on each machine, and compare everything. No sampling.
 - Reconcile counts: total files must equal the sum of all classes.
 - Prove its tools with known-answer fixtures and hostile file names, and run positive controls.

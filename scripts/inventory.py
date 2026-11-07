@@ -199,7 +199,7 @@ class Inventory:
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", action="append", required=True, help="label=/path")
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--output", required=True, help="a file, or - for stdout")
     parser.add_argument("--exclude", action="append", default=[], help="extra glob, relative to the root")
     parser.add_argument("--no-default-excludes", action="store_true")
     parser.add_argument("--jobs", type=int, default=min(8, os.cpu_count() or 4))
@@ -215,8 +215,10 @@ def main():
         roots.append((label, path))
 
     excludes = args.exclude + ([] if args.no_default_excludes else DEFAULT_EXCLUDES)
+    to_stdout = args.output == "-"
     tmp = args.output + ".partial"
-    with open(tmp, "w", encoding="ascii") as out:
+    with (open(os.devnull, "w", encoding="ascii") if to_stdout else open(tmp, "w", encoding="ascii")) as file_out:
+        out = sys.stdout if to_stdout else file_out
         out.write("#START\t%s\t%s\n" % (os.uname().nodename, time.strftime("%Y-%m-%dT%H:%M:%S%z")))
         inventory = Inventory(out, excludes)
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
@@ -224,8 +226,9 @@ def main():
                 out.write("#ROOT\t%s\t%s\n" % (enc(label.encode()), enc(os.fsencode(path))))
                 inventory.walk(label, path, pool)
         out.write("#END\t%s\n" % json.dumps(inventory.count, sort_keys=True))
-    os.replace(tmp, args.output)
-    print(json.dumps(inventory.count, sort_keys=True))
+    if not to_stdout:
+        os.replace(tmp, args.output)
+    print(json.dumps(inventory.count, sort_keys=True), file=sys.stderr if to_stdout else sys.stdout)
     if inventory.count["entries"] == 0:
         print("warning: nothing was inventoried, so check the --root paths", file=sys.stderr)
         return 2
