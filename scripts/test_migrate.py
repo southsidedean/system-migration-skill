@@ -138,12 +138,170 @@ class CopyTests(Base):
             self.assertNotEqual(result.returncode, OK, bad)
 
 
+class DiscoverTests(Base):
+    """A made-up home folder, so these never read the real one."""
+
+    def setUp(self):
+        super().setUp()
+        self.home = os.path.join(self.tmp, "home")
+        write(self.home, "Documents/Insurance/gateway.yaml", b"# Acme Corp gateway\n" * 5)
+        write(self.home, "Documents/Insurance/copy-of-gateway.yaml", b"# Acme Corp gateway\n" * 5)
+        write(self.home, "Documents/ok.txt", b"just soup " * 10)
+        write(self.home, "Documents/#odd name.txt", b"odd name " * 10)
+        write(self.home, ".DS_Store", b"noise " * 20)
+        write(self.home, "Library/Safari/History.db", b"binary\0" * 20)
+        write(self.home, ".claude/projects/log.jsonl", b"Acme Corp was mentioned " * 5)
+        write(self.home, "project/.env", b"API_TOKEN=abc\n")
+        self.git("init", "-q", cwd=os.path.join(self.home, "project"))
+        self.init()
+        self.terms = os.path.join(self.dir, "terms.txt")
+        with open(self.terms, "w") as handle:
+            handle.write("Acme Corp\n")
+
+    def git(self, *args, cwd):
+        subprocess.run(["git"] + list(args), cwd=cwd, check=True, capture_output=True)
+
+    def run_home(self, home, *args):
+        return subprocess.run([sys.executable, os.path.join(HERE, "migrate.py")] + list(args), capture_output=True, text=True,
+                              env=dict(os.environ, HOME=home))
+
+    def discover(self, label="source", home=None, *extra):
+        # Collecting runs real package tools, and the default roots hash every app, so only one test does those.
+        home = home or self.home
+        roots = () if "--root" in extra else ("--root", "home=%s" % home)
+        return self.run_home(home, "discover", "--dir", self.dir, "--label", label, "--no-collect", *roots, *extra)
+
+    def test_discover_writes_all_three_and_only_there(self):
+        before = sorted(os.path.join(p, f) for p, _, fs in os.walk(self.home) for f in fs)
+        result = self.discover()
+        self.assertEqual(result.returncode, OK, result.stderr)
+        folder = os.path.join(self.dir, "discovery")
+        self.assertEqual(sorted(os.listdir(folder)), ["source-scan.tsv", "source.tsv"])
+        with open(os.path.join(folder, "source.tsv")) as handle:
+            self.assertIn("#END", handle.read())
+        self.assertEqual(os.stat(os.path.join(folder, "source.tsv")).st_mode & 0o777, 0o600)
+        self.assertEqual(before, sorted(os.path.join(p, f) for p, _, fs in os.walk(self.home) for f in fs))
+
+    def test_discover_needs_terms_or_no_scan(self):
+        os.unlink(self.terms)
+        result = self.discover()
+        self.assertNotEqual(result.returncode, OK)
+        self.assertIn("no terms file", result.stderr)
+        result = self.discover("source", None, "--no-scan")
+        self.assertEqual(result.returncode, OK, result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "discovery", "source-scan.tsv")))
+
+    def test_discover_refuses_empty_terms_and_bad_labels(self):
+        with open(self.terms, "w") as handle:
+            handle.write("# nothing\n")
+        self.assertIn("empty", self.discover().stderr)
+        self.assertIn("label", self.discover("../up").stderr)
+
+    def test_failed_step_leaves_no_output(self):
+        result = self.discover("source", None, "--root", "home=/no/such/folder")
+        self.assertEqual(result.returncode, BAD)
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "discovery", "source.tsv")))
+        self.assertFalse(any(f.endswith(".partial") for f in os.listdir(os.path.join(self.dir, "discovery"))))
+
+    def test_collect_counts_repo_work_without_names(self):
+        repo = os.path.join(self.home, "project")
+        result = self.run_home(self.home, "discover", "--dir", self.dir, "--label", "source", "--no-scan")
+        self.assertEqual(result.returncode, OK, result.stderr)
+        with open(os.path.join(self.dir, "discovery", "source.json")) as handle:
+            state = json.load(handle)["git_repos"]["project"]
+        self.assertEqual((state["status"], state["uncommitted"], state["remotes"]), ("ok", 1, 0))
+        self.assertNotIn(".env", json.dumps(state))
+        self.assertTrue(os.path.isdir(repo))
+
+    def test_collect_finds_tools_outside_a_short_path(self):
+        sys.path.insert(0, HERE)
+        import migrate as module
+        env = module.tool_env()
+        self.assertIn("/opt/homebrew/bin", env["PATH"].split(os.pathsep))
+
+    def test_collect_lists_npm_globals_without_running_npm(self):
+        sys.path.insert(0, HERE)
+        import migrate as module
+        prefix = os.path.join(self.tmp, "prefix")
+        write(prefix, "lib/node_modules/npm/bin/npm-cli.js", b"#!/bin/sh\ntouch %s/ran\n" % self.tmp.encode())
+        write(prefix, "lib/node_modules/@scope/tool/package.json", b"{}")
+        os.chmod(os.path.join(prefix, "lib/node_modules/npm/bin/npm-cli.js"), 0o755)
+        os.makedirs(os.path.join(prefix, "bin"))
+        os.symlink("../lib/node_modules/npm/bin/npm-cli.js", os.path.join(prefix, "bin", "npm"))
+        found = module.npm_globals({"PATH": os.path.join(prefix, "bin")})
+        self.assertEqual(found, {"status": "ok", "output": ["@scope/tool", "npm"]})
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "ran")))
+
+    def test_report_sorts_what_needs_a_person(self):
+        dest_home = os.path.join(self.tmp, "dest-home")
+        write(dest_home, "Documents/ok.txt", b"just soup " * 10)
+        write(dest_home, "elsewhere/gateway-copy.yaml", b"# Acme Corp gateway\n" * 5)
+        self.assertEqual(self.discover().returncode, OK)
+        self.assertEqual(self.discover("dest", dest_home).returncode, OK)
+        result = self.run_home(self.home, "report", "--dir", self.dir, "--source", "source", "--dest", "dest")
+        self.assertEqual(result.returncode, OK, result.stderr)
+        self.assertNotIn("# Acme Corp gateway", result.stdout)
+        with open(os.path.join(self.dir, "discovery", "report-source.json")) as handle:
+            report = json.load(handle)
+        user = {item["path"]: item for item in report["files"]["user"]}
+        self.assertIn("home/Documents/#odd name.txt", user)
+        self.assertNotIn("home/Documents/ok.txt", user)
+        self.assertNotIn("home/.DS_Store", user)
+        self.assertEqual(report["counts"]["noise_files_not_listed"], 1)
+        self.assertIn("home/Library/Safari", report["groups"]["system"])
+        scan = report["source_scan"]
+        matched = {os.path.basename(item["path"]): item for item in scan["term_files"]}
+        self.assertEqual(sorted(matched), ["copy-of-gateway.yaml", "gateway.yaml"])
+        self.assertEqual(matched["gateway.yaml"]["same_content_on_dest"], ["home/elsewhere/gateway-copy.yaml"])
+        self.assertEqual(matched["gateway.yaml"]["same_content_elsewhere"], ["home/Documents/Insurance/copy-of-gateway.yaml"])
+        self.assertEqual([os.path.basename(p) for p in scan["own_records"]], ["log.jsonl"])
+        self.assertTrue(any(p.endswith("project/.env") for p in scan["secret_files"]))
+        self.assertEqual(report["files"].get("system"), None)
+
+    def test_report_lists_repos_with_work_at_risk(self):
+        folder = os.path.join(self.dir, "discovery")
+        self.assertEqual(self.discover().returncode, OK)
+        with open(os.path.join(folder, "source.json"), "w") as handle:
+            json.dump({"results": {"npm_global": {"status": "ok", "output": ["tool"]}},
+                       "git_repos": {"risky": {"status": "ok", "uncommitted": 0, "unpushed": 1, "stashes": 0, "remotes": 1},
+                                     "clean": {"status": "ok", "uncommitted": 0, "unpushed": 0, "stashes": 0, "remotes": 1}}}, handle)
+        result = self.run_home(self.home, "report", "--dir", self.dir, "--source", "source")
+        self.assertEqual(result.returncode, OK, result.stderr)
+        with open(os.path.join(folder, "report-source.json")) as handle:
+            report = json.load(handle)
+        self.assertEqual(list(report["repos_needing_care"]), ["risky"])
+        self.assertEqual(report["packages_only_on_source"], {"npm_global": ["tool"]})
+
+    def test_report_works_before_a_destination_exists(self):
+        self.assertEqual(self.discover().returncode, OK)
+        result = self.run_home(self.home, "report", "--dir", self.dir, "--source", "source")
+        self.assertEqual(result.returncode, OK, result.stderr)
+        self.assertIn("gateway.yaml", result.stdout)
+
+    def test_report_says_when_nothing_was_scanned(self):
+        self.assertEqual(self.discover("source", None, "--no-scan").returncode, OK)
+        result = self.run_home(self.home, "report", "--dir", self.dir, "--source", "source")
+        self.assertIn("NOT RUN", result.stdout)
+
+
 @unittest.skipUnless(os.environ.get("MIGRATE_TEST_HOST"), "set MIGRATE_TEST_HOST=user@host to test over SSH")
 class RemoteTests(Base):
     """The host must accept SSH keys and be able to read this temporary folder."""
 
     def remote(self, path):
         return "%s:%s" % (os.environ["MIGRATE_TEST_HOST"], path)
+
+    def test_discover_over_ssh_leaves_terms_off_the_machine(self):
+        self.init()
+        terms = os.path.join(self.dir, "terms.txt")
+        with open(terms, "w") as handle:
+            handle.write("zzmadeupterm-%d\n" % os.getpid())
+        result = migrate("discover", "--dir", self.dir, "--label", "remote", "--machine", os.environ["MIGRATE_TEST_HOST"],
+                         "--root", "home=%s" % self.src, "--no-collect")
+        self.assertEqual(result.returncode, OK, result.stderr)
+        folder = os.path.join(self.dir, "discovery")
+        self.assertEqual(sorted(os.listdir(folder)), ["remote-scan.tsv", "remote.tsv"])
+        self.assertEqual(os.listdir(self.src), [])
 
     def test_copy_over_ssh_with_awkward_names(self):
         names = ["#hash name.txt", "a b/c d.txt", "uni³.txt", "semi;colon.txt", "plain.txt", "paren(1).txt"]
@@ -367,7 +525,9 @@ class StateAndGateTests(Base):
 class CollectTests(Base):
     def test_writes_json_and_reports_counts(self):
         out = os.path.join(self.tmp, "collect.json")
-        result = migrate("collect", "--output", out, "--timeout", "20")
+        # A made-up home, so this never touches the real one's repos or tool folders.
+        result = subprocess.run([sys.executable, os.path.join(HERE, "migrate.py"), "collect", "--output", out, "--timeout", "20"],
+                                capture_output=True, text=True, env=dict(os.environ, HOME=self.tmp))
         self.assertEqual(result.returncode, OK, result.stderr)
         with open(out) as handle:
             data = json.load(handle)

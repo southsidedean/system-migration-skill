@@ -10,12 +10,14 @@ Commands print a short summary, write detail to files, and use fixed exit codes:
   decide     record a decision and render decisions.md
   approve    show a plan, and tie the user's approval to its exact contents
   record     record dated evidence for the gate
+  discover   run collect, inventory, and scan on a machine. Writes nothing there.
+  report     summarize discovery: what's unique, what matched, and what wasn't searched
   collect    write apps, packages, and settings to JSON (read-only)
   copy       copy from a plan: dry run by default, verified with --run
   archive    build an archive from a plan, read it back, and verify it
   delete     delete exact paths from a plan: dry run by default
   gate       check a source against the erase gate. Never erases anything.
-  inventory, compare, scan   run the matching script
+  inventory, compare, scan, report   run the matching script
 
 Locations are local paths or user@host:/path. Remote hosts need SSH keys and python3.
 """
@@ -27,6 +29,7 @@ import json
 import os
 import platform
 import posixpath
+import re
 import shutil
 import subprocess
 import sys
@@ -41,8 +44,8 @@ SHAPES = ("one-to-one", "many-to-one", "absorb", "consolidate")
 GATE_KINDS = ("final-compare", "final-backup", "credentials-retested", "secrets-reviewed",
               "git-clean", "local-app-data-checked", "archives-verified", "licenses-and-accounts")
 NEXT = {
-    1: "Run `collect` and `inventory` on every machine, and list what couldn't be read.",
-    2: "Run `scan`, then record each choice with `decide`, in small batches.",
+    1: "Run `discover` for every machine, then `report`, and list what couldn't be read.",
+    2: "Record each choice with `decide`, in small batches. Run `discover` again if the terms changed.",
     3: "Write the runbook, and have the user approve copy, archive, and delete plans.",
     4: "Run `copy` one stage at a time, and resolve every missing or different file.",
     5: "Run `archive` for anything leaving the active system.",
@@ -359,8 +362,6 @@ def cmd_gate(args):
 
 COMMON = {
     "git_config_names": ["git", "config", "--global", "--name-only", "--list"],
-    "vscode_extensions": ["code", "--list-extensions"],
-    "npm_global": ["npm", "-g", "ls", "--depth=0"],
     "pipx": ["pipx", "list", "--short"],
     "crontab": ["crontab", "-l"],
     "printers": ["lpstat", "-p"],
@@ -394,28 +395,221 @@ LINUX = {
 }
 
 
+# A non-interactive SSH session has a short PATH. Add the usual tool folders here rather than
+# start a login shell, because login shells run the user's startup files, which can change files.
+TOOL_DIRS = ("/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin",
+             os.path.expanduser("~/.local/bin"), "/snap/bin")
+# Without these, Homebrew could change the machine being inventoried.
+QUIET_TOOLS = {"HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1", "HOMEBREW_NO_BOOTSNAP": "1"}
+REPO_SKIP = {"Library", ".Trash", "node_modules", ".cache", ".npm", ".rbenv", ".pyenv", ".nvm", ".cargo", ".rustup", ".gem"}
+SF_DATALESS = 0x40000000
+
+
+def tool_env():
+    path = os.environ.get("PATH", os.defpath).split(os.pathsep)
+    return dict(os.environ, PATH=os.pathsep.join(path + [d for d in TOOL_DIRS if d not in path]), **QUIET_TOOLS)
+
+
+def npm_globals(env):
+    """List npm's global packages from their folder. Running npm writes logs, and prunes old ones."""
+    npm = shutil.which("npm", path=env["PATH"])
+    if not npm:
+        return {"status": "absent"}
+    marker = "/lib/node_modules/"
+    real = os.path.realpath(npm)
+    if marker not in real:
+        return {"status": "unknown-layout"}
+    folder = real.split(marker)[0] + marker
+    names: list = []
+    for name in sorted(os.listdir(folder)):
+        if name.startswith("@"):
+            names.extend("%s/%s" % (name, sub) for sub in sorted(os.listdir(os.path.join(folder, name))))
+        elif not name.startswith("."):
+            names.append(name)
+    return {"status": "ok", "output": names}
+
+
+def vscode_extensions():
+    """List VS Code's extensions from their folder. Running `code` can write to the home folder."""
+    folder = os.path.expanduser("~/.vscode/extensions")
+    if not os.path.isdir(folder):
+        return {"status": "absent"}
+    return {"status": "ok", "output": sorted(e.name for e in os.scandir(folder) if e.is_dir() and not e.name.startswith("."))}
+
+
+def find_repos(home):
+    """Git repos under home, skipping app data, tool folders, other disks, and cloud placeholders."""
+    found: list = []
+    try:
+        device = os.lstat(home).st_dev
+    except OSError:
+        return found
+    stack = [home]
+    while stack:
+        folder = stack.pop()
+        try:
+            with os.scandir(folder) as listing:
+                entries = [e for e in listing if e.is_dir(follow_symlinks=False)]
+        except OSError:
+            continue
+        if any(e.name == ".git" for e in entries):
+            found.append(folder)
+            continue
+        for entry in entries:
+            if entry.name in REPO_SKIP:
+                continue
+            try:
+                st = entry.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            if st.st_dev == device and not getattr(st, "st_flags", 0) & SF_DATALESS:
+                stack.append(entry.path)
+    return sorted(found)
+
+
+def repo_state(repo, env, timeout):
+    """Counts only, so no file names, commit messages, or remote URLs are collected."""
+    counts: dict = {}
+    checks = {"uncommitted": ["status", "--porcelain"], "remotes": ["remote"], "stashes": ["stash", "list"],
+              "unpushed": ["rev-list", "--count", "--branches", "--not", "--remotes"]}
+    for name, command in checks.items():
+        try:
+            done = subprocess.run(["git", "--no-optional-locks", "-C", repo] + command, capture_output=True, text=True,
+                                  errors="replace", timeout=timeout, env=env, stdin=subprocess.DEVNULL, check=False)
+        except subprocess.TimeoutExpired:
+            return {"status": "timeout"}
+        if done.returncode != 0:
+            return {"status": "exit-%d" % done.returncode}
+        counts[name] = int(done.stdout.strip() or 0) if name == "unpushed" else len(done.stdout.splitlines())
+    counts["status"] = "ok"
+    return counts
+
+
 def cmd_collect(args):
     table = dict(COMMON)
     table.update(MACOS if platform.system() == "Darwin" else LINUX)
+    env = tool_env()
     results: dict = {}
     absent = failed = 0
     for name, command in sorted(table.items()):
-        if not shutil.which(command[0]):
+        if not shutil.which(command[0], path=env["PATH"]):
             results[name] = {"status": "absent"}
             absent += 1
             continue
         try:
             done = subprocess.run(command, capture_output=True, text=True, errors="replace",
-                                  timeout=args.timeout, stdin=subprocess.DEVNULL, check=False)
+                                  timeout=args.timeout, env=env, stdin=subprocess.DEVNULL, check=False)
             results[name] = {"status": "ok" if done.returncode == 0 else "exit-%d" % done.returncode,
                              "output": done.stdout.splitlines()}
             failed += done.returncode != 0
         except subprocess.TimeoutExpired:
             results[name] = {"status": "timeout"}
             failed += 1
-    save_json(args.output, {"host": platform.node(), "system": platform.system(), "date": now(), "results": results})
-    print("collected=%d absent=%d not_ok=%d output=%s" % (len(table), absent, failed, args.output))
-    print("Not collected on purpose: secrets, and app settings that can trigger permission prompts.")
+    results["npm_global"] = npm_globals(env)
+    results["vscode_extensions"] = vscode_extensions()
+    absent += (results["npm_global"]["status"] == "absent") + (results["vscode_extensions"]["status"] == "absent")
+    home = os.path.expanduser("~")
+    repos = {}
+    if shutil.which("git", path=env["PATH"]):
+        repos = {os.path.relpath(repo, home): repo_state(repo, env, args.timeout) for repo in find_repos(home)}
+    data = {"host": platform.node(), "system": platform.system(), "date": now(), "results": results, "git_repos": repos}
+    summary = sys.stdout
+    if args.output == "-":
+        json.dump(data, sys.stdout, indent=2, sort_keys=True)
+        summary = sys.stderr
+    else:
+        save_json(args.output, data)
+    print("collected=%d absent=%d not_ok=%d git_repos=%d output=%s" % (len(table) + 2, absent, failed, len(repos), args.output), file=summary)
+    print("Not collected on purpose: secrets, and app settings that can trigger permission prompts.", file=summary)
+    return OK
+
+
+# --- discover
+
+def shell_start(python):
+    """Start a shell command that runs a script from stdin, kept awake on macOS.
+
+    It builds "$@" instead of a variable, because zsh, the usual login shell on a Mac, doesn't split variables.
+    """
+    return 'set -- %s -; command -v caffeinate >/dev/null 2>&1 && set -- caffeinate -i "$@"; ' % python
+
+
+def run_stream(machine, shell_command, script, output):
+    """Run a script on a machine, saving its stdout here. Nothing is written on that machine."""
+    if machine:
+        command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=20", machine, shell_command]
+    else:
+        command = ["/bin/sh", "-c", shell_command]
+    partial = output + ".partial"
+    fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as out:
+        done = subprocess.run(command, input=script.encode(), stdout=out, stderr=subprocess.PIPE, check=False)
+    return done.returncode, done.stderr.decode("utf-8", "replace").strip(), partial
+
+
+def discover_step(name, machine, shell_command, script, output, is_complete):
+    code, detail, partial = run_stream(machine, shell_command, script, output)
+    with open(partial, "rb") as handle:
+        complete = code == 0 and is_complete(handle.read())
+    if not complete:
+        os.unlink(partial)
+        print("%s failed on %s (exit %d): %s" % (name, machine or "this machine", code, detail[-400:]), file=sys.stderr)
+        return False
+    os.replace(partial, output)
+    print("%s: %s" % (name, detail.splitlines()[0] if detail else "done"))
+    return True
+
+
+def read_script(name):
+    with open(os.path.join(HERE, name), encoding="utf-8") as handle:
+        return handle.read()
+
+
+def cmd_discover(args):
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", args.label):
+        raise SystemExit("label can only hold letters, numbers, dots, dashes, and underscores: %r" % args.label)
+    terms = None
+    if not args.no_scan:
+        terms_file = args.terms or os.path.join(args.dir, "terms.txt")
+        if not os.path.isfile(terms_file):
+            raise SystemExit("no terms file: %s. Write the user's terms there, or use --no-scan." % terms_file)
+        with open(terms_file, encoding="utf-8") as handle:
+            terms = [line.strip() for line in handle if line.strip() and not line.startswith("#")]
+        if not terms:
+            raise SystemExit("the terms file is empty, so the scan would look clean without searching: %s" % terms_file)
+    folder = os.path.join(args.dir, "discovery")
+    os.makedirs(folder, mode=0o700, exist_ok=True)
+    prefix = os.path.join(folder, args.label)
+    python = "python3" if args.machine else shlex_quote(sys.executable)
+    start = shell_start(python)
+    if args.root:
+        inventory_roots = "".join('set -- "$@" --root %s; ' % shlex_quote(root) for root in args.root)
+        scan_roots = "".join('set -- "$@" --root %s; ' % shlex_quote(root.partition("=")[2]) for root in args.root)
+    else:
+        inventory_roots = 'set -- "$@" --root home="$HOME"; [ -d /Applications ] && set -- "$@" --root apps=/Applications; '
+        scan_roots = 'set -- "$@" --root "$HOME"; '
+
+    def is_json(data):
+        try:
+            json.loads(data)
+        except ValueError:
+            return False
+        return True
+
+    good = True
+    if not args.no_collect:
+        good = discover_step("collect", args.machine, start + 'exec "$@" collect --output -', read_script("migrate.py"),
+                             prefix + ".json", is_json)
+    # Only #END proves the inventory finished. A dropped connection can still leave a tidy-looking file.
+    good = discover_step("inventory", args.machine, start + inventory_roots + 'exec "$@" --output -', read_script("inventory.py"),
+                         prefix + ".tsv", lambda data: b"\n#END\t" in data[-2000:]) and good
+    if terms is not None:
+        script = "INLINE_TERMS = %r\n%s" % (terms, read_script("scan_sensitive.py"))
+        good = discover_step("scan", args.machine, start + scan_roots + 'exec "$@" --output -', script,
+                             prefix + "-scan.tsv", lambda data: data.startswith(b"kind\t")) and good
+    if not good:
+        return BAD
+    print("saved to %s. Nothing was written on %s." % (folder, args.machine or "this machine, outside that folder"))
     return OK
 
 
@@ -677,8 +871,8 @@ def passthrough(script):
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in ("inventory", "compare", "scan"):
-        script = {"inventory": "inventory.py", "compare": "compare.py", "scan": "scan_sensitive.py"}[sys.argv[1]]
+    if len(sys.argv) > 1 and sys.argv[1] in ("inventory", "compare", "scan", "report"):
+        script = {"inventory": "inventory.py", "compare": "compare.py", "scan": "scan_sensitive.py", "report": "report.py"}[sys.argv[1]]
         return subprocess.call([sys.executable, passthrough(script)] + sys.argv[2:])
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -731,8 +925,18 @@ def main():
     p.add_argument("--source-changed", help="ISO time the source last changed; older evidence is stale")
     p.set_defaults(func=cmd_gate)
 
+    p = sub.add_parser("discover")
+    p.add_argument("--dir", required=True, help="the migration folder, or an auditor's work folder")
+    p.add_argument("--label", required=True, help="names the output files, such as source or dest")
+    p.add_argument("--machine", help="user@host. Leave it out for this machine.")
+    p.add_argument("--root", action="append", help="label=/path. Default: home and /Applications.")
+    p.add_argument("--terms", help="default: terms.txt in --dir")
+    p.add_argument("--no-scan", action="store_true")
+    p.add_argument("--no-collect", action="store_true", help="for a rerun, such as a rescan with new terms")
+    p.set_defaults(func=cmd_discover)
+
     p = sub.add_parser("collect")
-    p.add_argument("--output", required=True)
+    p.add_argument("--output", required=True, help="a file, or - for stdout")
     p.add_argument("--timeout", type=int, default=30)
     p.set_defaults(func=cmd_collect)
 

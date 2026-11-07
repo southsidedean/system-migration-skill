@@ -38,6 +38,8 @@
 
 ## Results
 
+**A `.DS_Store` appeared that wasn't in the plan.** On a Mac, Finder can create one when a file arrives in a folder, and it can match the old machine's exactly. It's harmless.
+
 **Lots of `different` files.** Opening an app changes its files, so databases and `.DS_Store` often differ. Look at where they are before worrying, but don't dismiss them all without looking.
 
 **A file shows as `moved` or `possibly-moved`.** Its contents exist at another path. Check that this is what you expected. `possibly-moved` means the file is very small, so the match could be a coincidence.
@@ -60,7 +62,7 @@
 
 **Are archives encrypted?** No. Use your own tool, such as an encrypted disk image or `age`, and keep the password yourself.
 
-**Will it use a lot of tokens?** Small jobs and normal phases are designed to use few, since scripts do the heavy work. Independent audits can use a lot, so Claude tells you first.
+**Will it use a lot of tokens?** It depends on the size of the job. In testing, a small job used about 45,000 to 60,000, and a full migration with little data used about 210,000. An independent audit added about 200,000 per auditor, so Claude tells you first. [The results](../evals/RESULTS.md) have the details.
 
 **Can I stop and come back?** Yes. Ask Claude to continue from your migration folder. It re-checks the current state, because things may have changed.
 

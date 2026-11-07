@@ -208,13 +208,18 @@ def scan(root, patterns, output, max_size):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", action="append", required=True)
-    parser.add_argument("--terms", required=True)
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--terms")
+    parser.add_argument("--output", required=True, help="a file, or - for stdout")
     parser.add_argument("--max-size-mb", type=int, default=200, help="0 means no limit")
     args = parser.parse_args()
 
-    with open(args.terms, encoding="utf-8") as handle:
-        terms = [line.strip() for line in handle if line.strip() and not line.startswith("#")]
+    # `discover` prepends INLINE_TERMS to this script, so terms never reach the source's disk or process list.
+    terms = globals().get("INLINE_TERMS")
+    if terms is None:
+        if not args.terms:
+            parser.error("--terms is required")
+        with open(args.terms, encoding="utf-8") as handle:
+            terms = [line.strip() for line in handle if line.strip() and not line.startswith("#")]
     if not terms:
         parser.error("the terms file is empty, so the scan would look clean without searching")
     if not self_test():
@@ -226,13 +231,17 @@ def main():
         if not os.path.isdir(root):
             parser.error("root isn't a folder: %s" % root)
 
+    to_stdout = args.output == "-"
     tmp = args.output + ".partial"
     results: list = []
-    with open(tmp, "w", encoding="ascii") as out:
+    with (open(os.devnull, "w", encoding="ascii") if to_stdout else open(tmp, "w", encoding="ascii")) as file_out:
+        out = sys.stdout if to_stdout else file_out
         out.write("kind\tlocation\tterm\tcount\tsize\tpath\n")
         results.extend(scan(root, patterns, out, args.max_size_mb << 20) for root in args.root)
-    os.replace(tmp, args.output)
-    print(json.dumps({"self_test": "passed", "terms": len(terms), "roots": args.root, "results": results}))
+    if not to_stdout:
+        os.replace(tmp, args.output)
+    print(json.dumps({"self_test": "passed", "terms": len(terms), "roots": args.root, "results": results}),
+          file=sys.stderr if to_stdout else sys.stdout)
     if not any(r["files_seen"] for r in results):
         print("warning: no files were seen, so check the --root paths", file=sys.stderr)
         return 2

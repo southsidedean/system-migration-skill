@@ -58,9 +58,30 @@ python3 scripts/migrate.py decide --dir ~/migration-old-mac-2026-11 --source old
 
 ## Facts about a machine
 
+### `discover`
+
+Runs `collect`, `inventory`, and `scan` on one machine, and saves the results in `discovery/` in the migration folder. Over SSH, it sends each script through the connection and writes nothing on that machine, including your search terms.
+
+```sh
+python3 scripts/migrate.py discover --dir ~/migration-old-mac-2026-11 --label source --machine me@old-mac
+python3 scripts/migrate.py discover --dir ~/migration-old-mac-2026-11 --label dest
+```
+
+It reads terms from `terms.txt` in that folder, or `--terms <file>`. Use `--no-scan` to skip the search, `--no-collect` for a rescan with new terms, and `--root label=/path` to choose what's covered. By default, that's your home folder and `/Applications`.
+
+### `report`
+
+Summarizes discovery: files, apps, and packages unique to the source, term matches and their copies, likely secrets, what wasn't searched, and Git repos with work that may exist only there. It reports by path, never contents. Every path goes in `discovery/report-<source>.json`.
+
+```sh
+python3 scripts/migrate.py report --dir ~/migration-old-mac-2026-11 --source source --dest dest
+```
+
+Leave out `--dest` if the destination doesn't exist yet.
+
 ### `collect`
 
-Saves apps, packages, and some settings as JSON. Read-only. It skips secrets, and app settings that can trigger permission prompts.
+Saves apps, packages, and some settings as JSON, plus counts of uncommitted, unpushed, and stashed work in each Git repo. It doesn't change your files, though Homebrew may refresh its own cache. It skips secrets, and app settings that can trigger permission prompts. `discover` runs it for you.
 
 ```sh
 python3 scripts/migrate.py collect --output old-mac.json

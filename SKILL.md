@@ -11,7 +11,7 @@ Supported: macOS and Linux. Windows isn't supported yet; say so rather than impr
 
 ## Non-negotiable rules
 
-1. **Read-only until the user approves a plan.** Discovery changes nothing on any machine.
+1. **Read-only until the user approves a plan.** Discovery changes nothing on any machine, including temp files and tools' own logs. Use `discover`, and avoid login shells on a source, since they run startup files.
 2. **Success means verified.** An exit code is not proof. After every copy, compare counts and hashes with `scripts/compare.py`. An empty result is suspect until a positive control shows the check can find something.
 3. **Classify by contents, not names.** A folder's name can mislead in either direction. Show unclear items to the user; don't guess.
 4. **The user decides what happens to sensitive data.** Flag possible contractual or legal concerns and suggest they check, but don't give legal advice or decide for them.
@@ -67,13 +67,13 @@ Platform files: `references/platform-macos.md`, `references/platform-linux.md`. 
 
 ## Scripts do the facts
 
-Use `scripts/migrate.py <command>` for anything it covers. Don't write your own copy, archive, delete, or comparison commands, and don't reimplement a check by hand. Scripts give the same result each run and use far fewer tokens. You handle judgment: unclear classification, trade-offs, conflict rules, and talking to the user.
+Use `scripts/migrate.py <command>` for anything it covers. Don't write your own copy, archive, delete, or comparison commands, and don't reimplement a check by hand. Before writing an analysis script, check whether `report` already answers the question, and its JSON file has every path. Scripts give the same result each run and use far fewer tokens. You handle judgment: unclear classification, trade-offs, conflict rules, and talking to the user.
 
 | Command | Use |
 |---|---|
 | `init`, `status`, `advance` | Create or resume a migration. `status` gives the phase and next step. |
-| `collect`, `inventory` | Read-only facts about a machine |
-| `scan` | Search names and contents. Reports paths and counts, and skips credential stores. |
+| `discover` | Run `collect`, `inventory`, and `scan` on one machine, over SSH or locally. Writes nothing there. |
+| `report` | Summarize discovery: what's unique, what matched, what wasn't searched, and repos with work to save |
 | `compare` | Classify every file. Fails if the counts don't reconcile. |
 | `decide` | Record a decision, and render `decisions.md` |
 | `copy --plan` | Dry run by default. `--run` copies, keeps newer files, and verifies by hash. |
@@ -87,7 +87,7 @@ Plans must be approved before they run. Run `migrate.py approve --plan <file>`, 
 
 ## Working with the user
 
-- Ask in small batches, each with a recommendation. Explain consequences in plain terms.
+- Ask in small batches, each with a recommendation. Explain consequences in plain terms. If you have a tool for asking questions, use it as soon as you need decisions, rather than listing them in your report and waiting. When an answer needs typing, ask for it in that same step.
 - Keep the first report short: what's there, what needs a decision now, and what you couldn't check. Offer the detail, and don't send it all at once.
 - Separate what you measured from what you inferred, and correct your own mistakes as soon as you find them.
 - Copying credentials is the user's choice; offer to create new ones instead.
